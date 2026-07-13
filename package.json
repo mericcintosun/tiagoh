@@ -1,0 +1,26 @@
+{
+  "name": "tiagoh",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The insured settlement & trust layer for the agent economy, on Bitcoin (GOAT Network).",
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build",
+    "dev": "pnpm --filter @tiagoh/dashboard dev",
+    "dev:dashboard": "pnpm --filter @tiagoh/dashboard dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test",
+    "contracts:setup": "cd contracts && bash setup-deps.sh",
+    "contracts:deploy": "bash contracts/deploy.sh"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}

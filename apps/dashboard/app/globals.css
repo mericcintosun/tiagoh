@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ── tiagoh "Vault" tokens ─────────────────────────────────────────────
+     Warm ledger system. Primary = burnished gold (value/settlement).
+     `flow` = a single cool cyan, used ONLY for cascade lines + verified state.
+     Numbers/hashes = mono. ──────────────────────────────────────────────── */
+  :root {
+    --background: 40 38% 98%; /* warm receipt paper */
+    --foreground: 28 14% 12%; /* espresso ink */
+    --card: 40 33% 99%;
+    --card-foreground: 28 14% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 28 14% 12%;
+    --primary: 41 96% 50%; /* burnished gold */
+    --primary-foreground: 30 45% 9%;
+    --secondary: 40 22% 94%;
+    --secondary-foreground: 28 16% 16%;
+    --muted: 40 20% 94%;
+    --muted-foreground: 32 8% 40%;
+    --accent: 40 60% 91%;
+    --accent-foreground: 28 55% 24%; /* deep gold — safe as text on light */
+    --flow: 190 82% 38%; /* ledger cyan — cascade lines, "verified" */
+    --destructive: 4 74% 50%; /* slash / dispute */
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 58% 35%; /* settled / released */
+    --success-foreground: 0 0% 100%;
+    --warning: 24 92% 50%; /* pending / 402 challenge (orange, NOT gold) */
+    --warning-foreground: 0 0% 100%;
+    --border: 38 22% 87%;
+    --input: 38 22% 85%;
+    --ring: 41 96% 50%;
+    --radius: 0.5rem; /* tight radius → "instrument" precise */
+  }
+
+  .dark {
+    --background: 28 10% 7%; /* warm charcoal (NOT blue-black) */
+    --foreground: 40 18% 96%;
+    --card: 28 9% 10%;
+    --card-foreground: 40 18% 96%;
+    --popover: 28 10% 9%;
+    --popover-foreground: 40 18% 96%;
+    --primary: 41 98% 60%; /* bright gold */
+    --primary-foreground: 30 45% 8%;
+    --secondary: 28 7% 16%;
+    --secondary-foreground: 40 18% 96%;
+    --muted: 28 7% 15%;
+    --muted-foreground: 34 8% 62%;
+    --accent: 28 8% 18%;
+    --accent-foreground: 41 96% 66%;
+    --flow: 188 88% 56%;
+    --destructive: 4 78% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 60% 48%;
+    --success-foreground: 30 45% 8%;
+    --warning: 30 92% 58%;
+    --warning-foreground: 30 45% 8%;
+    --border: 28 7% 18%;
+    --input: 28 7% 22%;
+    --ring: 41 98% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1, "tnum" 1, "ss01" 1; /* tnum = tabular numerals */
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.26);
+  }
+}
+
+@layer components {
+  .glass {
+    background: hsl(var(--card) / 0.64);
+    backdrop-filter: blur(14px) saturate(135%);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
+  }
+
+  /* Ledger grid — warm hairlines, evokes an accounting sheet. */
+  .grid-bg {
+    background-image: linear-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* Vault aurora — warm gold + one cool cyan, low opacity. NOT a rainbow. */
+  .aurora {
+    background: radial-gradient(58% 52% at 16% 10%, hsl(var(--primary) / 0.15), transparent 60%),
+      radial-gradient(48% 48% at 88% 6%, hsl(var(--flow) / 0.12), transparent 62%),
+      radial-gradient(60% 60% at 62% 100%, hsl(var(--primary) / 0.07), transparent 60%);
+  }
+
+  /* Fine fractal-noise grain to kill banding on dark gradients. */
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  }
+
+  .text-gradient {
+    background: linear-gradient(
+      100deg,
+      hsl(var(--foreground)) 34%,
+      hsl(var(--primary)) 72%,
+      hsl(var(--flow))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.4), 0 0 40px -8px hsl(var(--primary) / 0.5);
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal.in {
+    opacity: 1;
+    transform: none;
+  }
+
+  .card-lift {
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-3px);
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 12px 40px -18px hsl(var(--primary) / 0.35);
+  }
+
+  /* Tabular mono numerals — the single strongest "fintech, not AI" signal. */
+  .num {
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

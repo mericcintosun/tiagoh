@@ -1,0 +1,33 @@
+{
+  "name": "@tiagoh/gateway",
+  "version": "0.1.0",
+  "description": "Seller-side x402 gateway: wraps an MCP server, prices tools, runs the charge-on-success flow, anchors receipts.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tiagoh/core": "workspace:*",
+    "@tiagoh/goat": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "viem": "^2.46.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  }
+}

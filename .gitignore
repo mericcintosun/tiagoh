@@ -1,0 +1,32 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# contracts (Foundry)
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+
+# env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+keys/
+
+# misc
+coverage/
+.turbo/
+.vercel/
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

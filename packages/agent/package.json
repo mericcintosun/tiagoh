@@ -1,0 +1,32 @@
+{
+  "name": "@tiagoh/agent",
+  "version": "0.1.0",
+  "description": "Autonomous buyer: discovers priced MCP tools, decides what to buy under a fixed budget, pays x402, reads reputation, disputes bad output.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tiagoh/core": "workspace:*",
+    "@tiagoh/client": "workspace:*",
+    "@anthropic-ai/sdk": "^0.68.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  }
+}

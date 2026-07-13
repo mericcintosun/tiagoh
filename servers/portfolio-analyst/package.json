@@ -1,0 +1,26 @@
+{
+  "name": "@tiagoh/server-portfolio-analyst",
+  "version": "0.1.0",
+  "description": "Paid MCP server that BUYS from other paid tools — the cascade in action.",
+  "type": "module",
+  "bin": {
+    "tiagoh-portfolio-analyst": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tiagoh/core": "workspace:*",
+    "@tiagoh/client": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  }
+}

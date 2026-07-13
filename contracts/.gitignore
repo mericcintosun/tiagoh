@@ -1,0 +1,10 @@
+# Foundry
+out/
+cache/
+broadcast/
+
+# Deps (re-cloned via setup-deps.sh)
+lib/
+
+# Env
+.env

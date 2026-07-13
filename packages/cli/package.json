@@ -1,0 +1,26 @@
+{
+  "name": "tiagoh",
+  "version": "0.1.0",
+  "description": "tiagoh CLI — init / wrap / connect. Monetize any MCP server on GOAT Network.",
+  "type": "module",
+  "bin": {
+    "tiagoh": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tiagoh/core": "workspace:*",
+    "@tiagoh/gateway": "workspace:*",
+    "@tiagoh/client": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  }
+}

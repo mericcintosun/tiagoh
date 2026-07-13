@@ -1,0 +1,23 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+solc = "0.8.24"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+bytecode_hash = "none"
+cbor_metadata = false
+fs_permissions = [{ access = "read", path = "./" }]
+
+# tiagoh — Solidity contract layer for the insured settlement & trust layer
+# for the agent economy on GOAT Network (Bitcoin L2, EVM-compatible).
+# Remappings live in remappings.txt.
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false
