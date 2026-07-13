@@ -101,7 +101,7 @@ tiagoh = **the monetization core** + **five trust features (the gap we researche
 | ID | Feature | Requirement |
 | --- | --- | --- |
 | C1 | **Wrap** (`tiagoh wrap`) | Put an x402 paywall in front of any existing MCP server, unchanged. Per-tool price advertised in `tools/list` (`_meta.tiagoh.priceUsd`). |
-| C2 | **Connect** (`tiagoh connect`) | stdio bridge so any MCP host (Claude Code, Claude Desktop, Cursor) calls paid servers, answering 402 challenges automatically under a spending budget. |
+| C2 | **Connect** (`tiagoh connect`) | stdio bridge so any MCP host (Claude Code, Claude Desktop, Cursor, **OpenClaw/ClawUp**) calls paid servers, answering 402 challenges automatically under a spending budget. See `examples/openclaw`. |
 | C3 | **Cascade** | When a paid tool buys from other paid tools, compose payments into a linked tree (see 5.3). |
 | C4 | **Charge-on-success** | The gateway settles payment **only if the tool call succeeds**; a failed call is never billed. |
 | C5 | **On-chain receipts** | Every settled call anchored with its cascade `parentId`; the full graph reconstructs from chain data alone. |

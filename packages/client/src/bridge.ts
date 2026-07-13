@@ -2,8 +2,8 @@ import type { BudgetGuard } from "./budget.js";
 
 /**
  * stdio bridge for `tiagoh connect`: lets any MCP host (Claude Code, Claude
- * Desktop, Cursor) call paid servers, answering 402 challenges automatically
- * under a spending budget.
+ * Desktop, Cursor, OpenClaw/ClawUp) call paid servers, answering 402 challenges
+ * automatically under a spending budget. See examples/openclaw for the ClawUp setup.
  *
  * The bridge speaks MCP over stdio to the host and forwards tools/call to the
  * remote paid gateway via the paying fetch. Wiring to @modelcontextprotocol/sdk
