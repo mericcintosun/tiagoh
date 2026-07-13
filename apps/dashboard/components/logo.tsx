@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 
 /**
- * tiagoh wordmark — lowercase mono `tiagoh` + a small ledger/cascade mark.
- * Gold mark on charcoal. The mark is three cascading nodes joined by a cyan flow line.
+ * tiagoh brand — a teal interlocking-knot mark (the "linked / cascade" motif)
+ * + a serif `tiagoh` wordmark.
  */
 export function Logo({
   className,
@@ -15,7 +15,10 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-2", className)}>
       <LedgerMark className="h-6 w-6" />
       {showWordmark && (
-        <span className="font-mono text-[15px] font-semibold tracking-tight text-foreground">
+        <span
+          className="text-[17px] font-semibold tracking-tight text-foreground"
+          style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
+        >
           tiagoh
         </span>
       )}
@@ -23,26 +26,12 @@ export function Logo({
   );
 }
 
+/** The tiagoh mark: two interlocking rounded loops (teal), scales to any size. */
 export function LedgerMark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-    >
-      {/* cascade flow line (cyan) */}
-      <path
-        d="M5 5.5 L12 12 L19 18.5"
-        stroke="hsl(var(--flow))"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity="0.9"
-      />
-      {/* cascading value nodes (gold) */}
-      <circle cx="5" cy="5.5" r="2.4" fill="hsl(var(--primary))" />
-      <circle cx="12" cy="12" r="2.4" fill="hsl(var(--primary))" />
-      <circle cx="19" cy="18.5" r="2.4" fill="hsl(var(--primary))" />
+    <svg viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <rect x="7.5" y="16" width="22" height="19" rx="9.5" stroke="#2E9E8E" strokeWidth="4.6" />
+      <rect x="18.5" y="13" width="22" height="19" rx="9.5" stroke="#2E9E8E" strokeWidth="4.6" />
     </svg>
   );
 }
