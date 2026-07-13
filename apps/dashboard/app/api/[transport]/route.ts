@@ -73,6 +73,38 @@ const handler = createMcpHandler(
   { basePath: "/api", maxDuration: 60, verboseLogs: false },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+/**
+ * Compatibility wrapper: some MCP clients/registries (e.g. ClawUp's validator)
+ * send only `Accept: application/json`, which the streamable-HTTP transport
+ * rejects with 406. We normalize the Accept header so any client works, and
+ * answer a plain GET with a friendly descriptor instead of 405.
+ */
+async function normalize(req: Request): Promise<Request> {
+  const headers = new Headers(req.headers);
+  const accept = headers.get("accept") ?? "";
+  if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
+    headers.set("accept", "application/json, text/event-stream");
+  }
+  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+  const body = hasBody ? await req.arrayBuffer() : undefined;
+  return new Request(req.url, { method: req.method, headers, body });
+}
+
+const POST = async (req: Request) => handler(await normalize(req));
+const DELETE = POST;
+
+const GET = () =>
+  new Response(
+    JSON.stringify({
+      name: "tiagoh",
+      description: "Paid GOAT/BTC market data, RWA prices & DeFi yields (x402).",
+      transport: "streamable-http",
+      endpoint: "/api/mcp",
+      tools: ["get_goat_market_data", "get_rwa_price", "get_defi_yields"],
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+
+export { GET, POST, DELETE };
 export const runtime = "nodejs";
 export const maxDuration = 60;
