@@ -1,0 +1,20 @@
+{
+  "name": "@tiagoh/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runnable end-to-end x402 demo: gateway ↔ paying client, charge-on-success, cascade, budget enforcement.",
+  "scripts": {
+    "demo": "tsx src/demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tiagoh/core": "workspace:*",
+    "@tiagoh/gateway": "workspace:*",
+    "@tiagoh/client": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

@@ -28,10 +28,14 @@ export function createPayingFetch(opts: PayingFetchOptions) {
     const challenge = (await first.clone().json()) as { priceUsd: number; asset: string };
 
     // Budget guard: abort BEFORE signing if it would breach a cap.
-    opts.budget.charge(challenge.priceUsd);
+    opts.budget.check(challenge.priceUsd);
 
     const signature = await opts.sign(challenge);
     headers.set(TIAGOH.PAYMENT_SIG_HEADER, signature);
-    return doFetch(url, { ...init, headers });
+    const paid = await doFetch(url, { ...init, headers });
+
+    // Charge-on-success: commit the spend only if the paid call actually succeeded.
+    if (paid.ok) opts.budget.charge(challenge.priceUsd);
+    return paid;
   };
 }

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import { TIAGOH, type Receipt, type TiagohConfig } from "@tiagoh/core";
-import { priceForTool } from "./pricing.js";
+import { priceForTool, annotatePrices } from "./pricing.js";
 import { buildDiscoveryDocument } from "./discovery.js";
 
 export type SettleFn = (args: {
@@ -12,12 +12,19 @@ export type SettleFn = (args: {
   signature: string;
 }) => Promise<{ txHash?: string; payee: string }>;
 
-export type UpstreamCall = (tool: string, args: unknown) => Promise<unknown>;
+export type UpstreamCall = (
+  tool: string,
+  args: unknown,
+  ctx: { paymentId: string; parentId: string | null },
+) => Promise<unknown>;
+export type UpstreamList = () => Promise<Array<{ name: string; description?: string }>>;
 
 export interface GatewayOptions {
   config: TiagohConfig;
   /** Calls the wrapped upstream MCP tool. */
   callUpstream: UpstreamCall;
+  /** Lists upstream tools (defaults to the priced tools in config). */
+  listUpstream?: UpstreamList;
   /** Settles an x402 payment via the GOAT facilitator (see @tiagoh/goat). */
   settle: SettleFn;
   /** Sink for anchored receipts (e.g. ReceiptRegistry writer). */
@@ -48,11 +55,15 @@ export class TiagohGateway {
     | { kind: "ok"; result: unknown; receipt: Receipt }
   > {
     const price = priceForTool(this.config, input.tool);
+    const parentId = input.parentId ?? null;
+    const payer = input.payer ?? "anon";
 
     // Free tool → run and return, no payment.
     if (!price || price.priceUsd === 0) {
-      const result = await this.opts.callUpstream(input.tool, input.args);
-      const receipt = this.receipt(input.tool, 0, input.payer ?? "anon", input.parentId ?? null, "settled");
+      const paymentId = randomUUID();
+      const result = await this.opts.callUpstream(input.tool, input.args, { paymentId, parentId });
+      const receipt = this.receipt(paymentId, input.tool, 0, payer, parentId, "settled");
+      this.opts.onReceipt?.(receipt);
       return { kind: "ok", result, receipt };
     }
 
@@ -61,21 +72,24 @@ export class TiagohGateway {
       return { kind: "payment_required", priceUsd: price.priceUsd, asset: this.config.asset };
     }
 
-    // Paid → run upstream FIRST; only settle if it succeeds.
-    const result = await this.opts.callUpstream(input.tool, input.args);
+    // Paid → mint the paymentId, run upstream FIRST (it may cascade using this id
+    // as the parent), and only settle if the tool succeeds (charge-on-success).
+    const paymentId = randomUUID();
+    const result = await this.opts.callUpstream(input.tool, input.args, { paymentId, parentId });
     const { txHash, payee } = await this.opts.settle({
       tool: input.tool,
       amountUsd: price.priceUsd,
-      payer: input.payer ?? "anon",
-      parentId: input.parentId ?? null,
+      payer,
+      parentId,
       signature: input.signature,
     });
-    const receipt = this.receipt(input.tool, price.priceUsd, input.payer ?? "anon", input.parentId ?? null, "settled", payee, txHash);
+    const receipt = this.receipt(paymentId, input.tool, price.priceUsd, payer, parentId, "settled", payee, txHash);
     this.opts.onReceipt?.(receipt);
     return { kind: "ok", result, receipt };
   }
 
   private receipt(
+    paymentId: string,
     tool: string,
     amountUsd: number,
     payer: string,
@@ -85,7 +99,7 @@ export class TiagohGateway {
     txHash?: string,
   ): Receipt {
     return {
-      paymentId: randomUUID(),
+      paymentId,
       parentId,
       tool,
       payer,
@@ -98,18 +112,52 @@ export class TiagohGateway {
     };
   }
 
-  /** Start an HTTP server exposing the MCP endpoint + discovery document. */
+  /** Start an HTTP server exposing discovery + the priced MCP tool routes. */
   serve(port = this.config.port) {
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      if (req.url === TIAGOH.DISCOVERY_PATH) {
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify(buildDiscoveryDocument(this.config)));
-        return;
-      }
-      // TODO: bridge JSON-RPC MCP messages to handleToolCall (parentId from headers).
-      res.writeHead(404).end();
+      void this.route(req, res).catch((err) => json(res, 500, { error: String(err) }));
     });
     server.listen(port);
     return server;
   }
+
+  private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (req.method === "GET" && req.url === TIAGOH.DISCOVERY_PATH) {
+      return json(res, 200, buildDiscoveryDocument(this.config));
+    }
+    if (req.method === "POST" && req.url === "/mcp/tools/list") {
+      const upstream = (await this.opts.listUpstream?.()) ?? this.config.tools.map((t) => ({ name: t.name, description: t.description }));
+      return json(res, 200, { tools: annotatePrices(this.config, upstream) });
+    }
+    if (req.method === "POST" && req.url === "/mcp/tools/call") {
+      const body = (await readJson(req)) as { tool: string; args?: unknown; payer?: string };
+      const signature = header(req, TIAGOH.PAYMENT_SIG_HEADER);
+      const parentId = header(req, TIAGOH.PARENT_ID_HEADER) ?? null;
+      const out = await this.handleToolCall({ tool: body.tool, args: body.args, signature, payer: body.payer, parentId });
+      if (out.kind === "payment_required") {
+        return json(res, 402, { priceUsd: out.priceUsd, asset: out.asset });
+      }
+      res.setHeader(TIAGOH.PAYMENT_ID_HEADER, out.receipt.paymentId);
+      return json(res, 200, { result: out.result, receipt: out.receipt });
+    }
+    json(res, 404, { error: "not found" });
+  }
+}
+
+// ── tiny HTTP helpers ────────────────────────────────────────────────────────
+function json(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+function header(req: IncomingMessage, name: string): string | undefined {
+  const v = req.headers[name.toLowerCase()];
+  return Array.isArray(v) ? v[0] : v;
+}
+
+async function readJson(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
 }

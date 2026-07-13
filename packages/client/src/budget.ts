@@ -30,10 +30,15 @@ export class BudgetGuard {
     return amountUsd <= this.perCallCapUsd && this.spent + amountUsd <= this.sessionCapUsd;
   }
 
-  /** Reserve budget for a payment; throws if it would breach a cap. */
-  charge(amountUsd: number): void {
+  /** Assert a payment is affordable WITHOUT committing; throws if it would breach a cap. */
+  check(amountUsd: number): void {
     if (amountUsd > this.perCallCapUsd) throw new BudgetExceededError(amountUsd, "per-call");
     if (this.spent + amountUsd > this.sessionCapUsd) throw new BudgetExceededError(amountUsd, "per-session");
+  }
+
+  /** Commit a payment against the budget; throws if it would breach a cap. */
+  charge(amountUsd: number): void {
+    this.check(amountUsd);
     this.spent += amountUsd;
   }
 }
