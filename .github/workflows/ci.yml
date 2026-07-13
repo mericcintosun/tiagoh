@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - name: Build packages
+        run: pnpm -r --filter "./packages/**" build
+      - name: End-to-end x402 demo (mock facilitator)
+        run: pnpm --filter @tiagoh/e2e demo
+      - name: Autonomous buyer (simulated)
+        run: pnpm --filter @tiagoh/e2e agent
+      - name: Dashboard build
+        run: pnpm --filter @tiagoh/dashboard build
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Fetch contract deps
+        run: cd contracts && bash setup-deps.sh
+      - name: forge build + test
+        run: cd contracts && forge build && forge test -vv

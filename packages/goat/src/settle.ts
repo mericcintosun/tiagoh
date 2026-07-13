@@ -85,3 +85,30 @@ export function createOnchainSettle(opts: OnchainSettleOptions) {
     return p;
   };
 }
+
+export interface FacilitatorSettleOptions {
+  /** Hosted GOAT x402 facilitator endpoint (verify + settle). */
+  facilitatorUrl: string;
+  /** ERC-3009 / Permit2 payment token the facilitator settles. */
+  token: Address;
+  privateKey: Hex;
+  receiptRegistry?: Address;
+  rpcUrl?: string;
+}
+
+/**
+ * PREPARED — the real settlement path, awaiting GOAT x402 Integration Faucet access
+ * (payment token + facilitator endpoint). Instead of anchoring a receipt from a mock
+ * signature, this verifies the buyer's signed ERC-3009 / Permit2 authorization and
+ * settles it through the hosted GOAT facilitator using @goatnetwork/agentkit's x402
+ * adapters (HttpMerchantGatewayAdapter + submitSignatureAction), then anchors the
+ * receipt. Swap `createOnchainSettle` for this once the faucet is granted — the gateway
+ * `SettleFn` shape is unchanged, so nothing else moves.
+ */
+export function createFacilitatorSettle(_opts: FacilitatorSettleOptions): never {
+  throw new Error(
+    "createFacilitatorSettle: awaiting GOAT x402 facilitator access (x402 Integration Faucet). " +
+      "Wire @goatnetwork/agentkit HttpMerchantGatewayAdapter.verify + submitSignatureAction here, " +
+      "then anchor via createOnchainSettle's ReceiptRegistry write.",
+  );
+}

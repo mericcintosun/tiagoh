@@ -42,3 +42,18 @@ redeployed bound to that token to exercise real transfers.
 | Auction (§5.5) | 3 signed bids (80/50/65) → `clear` picks lowest-price winner @50 → `settle` |
 | Revenue splits | fund 1000, 60/40 → `release` P1=600 / P2=400 |
 | Prepaid channels | `open(1000)` → redeem vouchers 300 then 500 (recipient +500) → stale voucher **`NonMonotonic`** → close refunds 500 |
+
+## End-to-end x402 pipeline → real on-chain receipts
+
+The off-chain flow (`agent → paying client → gateway (402) → charge-on-success`) anchored real
+receipts to `ReceiptRegistry` on GOAT Testnet3 (`count` 8 → 14). The cascade run's downstream hops
+link to the `analyze_portfolio` root receipt. Reproduce: `TIAGOH_ONCHAIN=1 pnpm --filter @tiagoh/e2e demo`.
+
+| Call | Tx |
+| --- | --- |
+| get_goat_market_data | [`0xf1ff3d…`](https://explorer.testnet3.goat.network/tx/0xf1ff3d3cd578e5931cef4e39100e3971eac94e8e822254eb03017ce955d98dc5) |
+| get_rwa_price | [`0x8b52a6…`](https://explorer.testnet3.goat.network/tx/0x8b52a6066bf1cd91bd8e226817a82f57c341066ff7d4f542c632e54e71c3f26d) |
+| cascade · get_rwa_price | [`0x328d0b…`](https://explorer.testnet3.goat.network/tx/0x328d0b415a5f6cce8d6c6ebd7870bde3fb531d0b5c8dd013be4d88add7c118a9) |
+| cascade · get_goat_market_data | [`0x6d9cbd…`](https://explorer.testnet3.goat.network/tx/0x6d9cbd2e9337a35639cdde2582a4e2a78986725e3c080c7d69ea51e18a488839) |
+| cascade · get_defi_yields | [`0x1b4543…`](https://explorer.testnet3.goat.network/tx/0x1b45434a3183fca5c7cb3a44d240f580c3a8187206d13d68854df928de0f11eb) |
+| cascade root · analyze_portfolio | [`0x1062ab…`](https://explorer.testnet3.goat.network/tx/0x1062ab2bb121078b46f31b91fe929a35e6802a34800755511946220650b041f4) |

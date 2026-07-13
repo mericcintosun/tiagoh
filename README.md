@@ -49,6 +49,27 @@ Two halves:
 - **[DESIGN.md](docs/DESIGN.md)** — the "Vault" design system: color palette, tokens, shadcn/ui
   component inventory, and the layout map (frontend spec).
 
+## Run the demos
+
+```bash
+pnpm install && pnpm -r --filter "./packages/**" build
+
+# End-to-end x402 flow (local mock facilitator): per-call payment, charge-on-success,
+# a 3-hop cascade, and pre-sign budget rejection.
+pnpm --filter @tiagoh/e2e demo
+
+# Same flow, anchoring REAL receipts to ReceiptRegistry on GOAT Testnet3:
+TIAGOH_ONCHAIN=1 PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e demo
+
+# The autonomous buyer driving the live gateway (discover → decide → pay → synthesize).
+# Defaults to a labeled offline simulation; TIAGOH_AGENT_LIVE=1 + ANTHROPIC_API_KEY runs live Claude.
+pnpm --filter @tiagoh/e2e agent
+
+# Contracts
+pnpm contracts:setup && pnpm contracts:test        # 16/16
+pnpm contracts:deploy                              # deploy to GOAT testnet
+```
+
 ## Positioning (honest)
 
 We aim to be **first on GOAT** on all five features, and **world-first** on the one that only makes
