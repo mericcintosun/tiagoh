@@ -5,6 +5,7 @@ import { priceForTool, annotatePrices } from "./pricing.js";
 import { buildDiscoveryDocument } from "./discovery.js";
 
 export type SettleFn = (args: {
+  paymentId: string;
   tool: string;
   amountUsd: number;
   payer: string;
@@ -77,6 +78,7 @@ export class TiagohGateway {
     const paymentId = randomUUID();
     const result = await this.opts.callUpstream(input.tool, input.args, { paymentId, parentId });
     const { txHash, payee } = await this.opts.settle({
+      paymentId,
       tool: input.tool,
       amountUsd: price.priceUsd,
       payer,

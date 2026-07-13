@@ -12,3 +12,4 @@ export * from "./x402.js";
 export * from "./erc8004.js";
 export * from "./mcp.js";
 export * from "./runtime.js";
+export * from "./settle.js";

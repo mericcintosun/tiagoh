@@ -293,6 +293,9 @@ importers:
 
   tools/e2e:
     dependencies:
+      '@tiagoh/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@tiagoh/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -302,6 +305,9 @@ importers:
       '@tiagoh/gateway':
         specifier: workspace:*
         version: link:../../packages/gateway
+      '@tiagoh/goat':
+        specifier: workspace:*
+        version: link:../../packages/goat
     devDependencies:
       tsx:
         specifier: ^4.19.2

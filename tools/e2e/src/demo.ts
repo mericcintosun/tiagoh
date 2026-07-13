@@ -1,6 +1,7 @@
 import { TiagohGateway } from "@tiagoh/gateway";
 import { BudgetGuard, BudgetExceededError, listPaidTools, callPaidTool } from "@tiagoh/client";
 import { TiagohConfigSchema, type Receipt } from "@tiagoh/core";
+import { createOnchainSettle } from "@tiagoh/goat";
 
 /**
  * End-to-end x402 flow, fully runnable (local mock facilitator, no chain needed):
@@ -63,11 +64,29 @@ const config = TiagohConfigSchema.parse({
   ],
 });
 
+// TIAGOH_ONCHAIN=1 anchors every settled call to the real ReceiptRegistry on GOAT
+// Testnet3 (needs PRIVATE_KEY); otherwise a local mock facilitator is used.
+const ONCHAIN = process.env.TIAGOH_ONCHAIN === "1";
+const RECEIPT_REGISTRY = (process.env.RECEIPT_REGISTRY_ADDRESS ??
+  "0xb55822243ea12738A50De04B0AeE4f671732FFBb") as `0x${string}`;
+const TOKEN = (process.env.TIAGOH_PAYMENT_TOKEN ??
+  "0x4ca4edff504bb87d95a4deab67507bb1201de948") as `0x${string}`;
+const EXPLORER = "https://explorer.testnet3.goat.network/tx/";
+
+const onchainSettle = ONCHAIN
+  ? createOnchainSettle({
+      privateKey: process.env.PRIVATE_KEY as `0x${string}`,
+      receiptRegistry: RECEIPT_REGISTRY,
+      token: TOKEN,
+    })
+  : null;
+
 const gateway = new TiagohGateway({
   config,
   callUpstream,
-  // Local mock facilitator (chain-free dev). Real mode → @tiagoh/goat facilitator + ReceiptRegistry.
-  settle: async ({ tool }) => ({ txHash: `mock:${tool}`, payee: config.payTo }),
+  settle: onchainSettle
+    ? (a) => onchainSettle({ paymentId: a.paymentId, tool: a.tool, amountUsd: a.amountUsd, parentId: a.parentId })
+    : async ({ tool }) => ({ txHash: `mock:${tool}`, payee: config.payTo }),
   onReceipt: (r) => receipts.push(r),
 });
 
@@ -130,6 +149,10 @@ async function main() {
   console.log("\n── summary ──");
   console.log(`   receipts settled: ${receipts.length} · total volume ${money(settled)}`);
   console.log(`   agent budget spent: ${money(0.3 - budget.remainingUsd)} / ${money(0.3)}`);
+  if (ONCHAIN) {
+    console.log("\n   on-chain receipts anchored (GOAT Testnet3):");
+    for (const r of receipts) console.log(`      ${r.tool.padEnd(22)} ${EXPLORER}${r.txHash}`);
+  }
   console.log(failed === 0 ? "\n✓ end-to-end x402 flow works" : `\n✗ ${failed} assertion(s) failed`);
 
   server.close();
