@@ -1,0 +1,14 @@
+{
+  "upstream": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-everything"]
+  },
+  "payTo": "0x0000000000000000000000000000000000000000",
+  "asset": "0x4ca4edff504bb87d95a4deab67507bb1201de948",
+  "chainId": 48816,
+  "port": 4402,
+  "tools": [
+    { "name": "echo", "priceUsd": 0.01, "description": "echo a message" },
+    { "name": "add", "priceUsd": 0.01, "description": "add two numbers" }
+  ]
+}
