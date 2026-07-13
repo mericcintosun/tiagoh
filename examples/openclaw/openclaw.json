@@ -1,18 +1,12 @@
 {
-  "//": "Drop this under ~/.openclaw/openclaw.json (merge the mcp.servers block). It registers",
-  "//2": "tiagoh's paying stdio bridge as an MCP server so an OpenClaw/ClawUp agent can call paid",
-  "//3": "tiagoh tools; the bridge answers x402 402-challenges automatically under TIAGOH_MAX_SESSION.",
+  "//": "Register tiagoh's hosted paid-MCP endpoint with an OpenClaw / ClawUp agent.",
+  "//2": "The tools are served over streamable-HTTP at tiagoh.vercel.app/api/mcp and are",
+  "//3": "also listed in the ClawUp MCP marketplace (submit id: tiagoh). Merge mcp.servers.",
   "mcp": {
     "servers": {
       "tiagoh": {
-        "command": "npx",
-        "args": ["tiagoh", "connect", "http://localhost:4402/mcp"],
-        "env": {
-          "TIAGOH_KEY_PATH": "./agent.pem",
-          "TIAGOH_MAX_SESSION": "5000000000",
-          "GOAT_RPC_URL": "https://rpc.testnet3.goat.network",
-          "GOAT_CHAIN_ID": "48816"
-        }
+        "url": "https://tiagoh.vercel.app/api/mcp",
+        "transport": "streamable-http"
       }
     }
   }

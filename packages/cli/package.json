@@ -17,6 +17,7 @@
     "@tiagoh/core": "workspace:*",
     "@tiagoh/gateway": "workspace:*",
     "@tiagoh/client": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
     "commander": "^12.1.0"
   },
   "devDependencies": {

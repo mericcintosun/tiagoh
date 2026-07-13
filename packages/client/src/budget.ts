@@ -41,4 +41,9 @@ export class BudgetGuard {
     this.check(amountUsd);
     this.spent += amountUsd;
   }
+
+  /** Credit budget back (e.g. a disputed call was refunded). */
+  refund(amountUsd: number): void {
+    this.spent = Math.max(0, this.spent - amountUsd);
+  }
 }
