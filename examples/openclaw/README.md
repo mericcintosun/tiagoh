@@ -1,56 +1,43 @@
 # tiagoh × OpenClaw / ClawUp
 
-Give an **OpenClaw** agent (deployed in seconds on **[ClawUp](https://x.com/ClawUpAI)**, the
-managed OpenClaw platform on GOAT) the ability to discover, pay for, and *trust* paid MCP tools
-through tiagoh — per call over x402, under a fixed budget, on GOAT Network.
+Give an **OpenClaw** agent (deployed in seconds on **[ClawUp](https://clawup.org)**, the managed
+OpenClaw platform on GOAT) the ability to call tiagoh's paid MCP tools — GOAT/BTC market data, RWA
+prices, DeFi yields — priced per call over x402 on GOAT Network.
 
-OpenClaw is a first-class MCP host, so tiagoh plugs straight in.
+OpenClaw is a first-class MCP host, so tiagoh plugs straight in over its **hosted, streamable-HTTP
+MCP endpoint** — no local bridge to run.
 
 ## How it fits
 
 ```
-OpenClaw agent (on ClawUp)  ──MCP──▶  tiagoh connect (stdio bridge)  ──x402──▶  tiagoh gateway ──▶ paid MCP tool
-        │                                    │  answers 402 challenges                 │  charge-on-success
-        │                                    │  under a spending budget                │  receipt anchored on GOAT
-        └── just calls the tool ─────────────┘                                         └── settled with Bitcoin finality
+OpenClaw agent (on ClawUp)  ──MCP (streamable-http)──▶  https://tiagoh.vercel.app/api/mcp
+        │                                                 (tiagoh paid tools; x402-priced,
+        └── just calls the tool ──────────────────────────  settled on GOAT with Bitcoin finality)
 ```
 
-The agent calls a tool like any other; **`tiagoh connect`** sits in between and pays each x402
-challenge automatically, aborting before signing if a call would breach the agent's budget. The
-OpenClaw agent never has to understand payments — it just gets trustworthy, insured tools.
+The agent calls a tool like any other; tiagoh serves the tools over HTTP and prices each call in
+x402. The tools are also listed in the **ClawUp MCP marketplace** (submission id: `tiagoh`), so any
+ClawUp agent can attach them with one click.
 
 ## Setup
 
-**1. Run a paid tiagoh gateway** (the seller side — wraps any MCP server behind an x402 paywall):
+**Option A — ClawUp marketplace (no config):** in ClawUp → **Tools → Marketplace**, find `tiagoh`
+and **Add to Agent**.
 
-```bash
-npx tiagoh init          # writes tiagoh.config.json (upstream, payTo, asset, per-tool prices)
-npx tiagoh wrap          # your MCP server is now paid at http://localhost:4402/mcp
-```
-
-**2. Register tiagoh with your OpenClaw agent** — point OpenClaw at the `tiagoh connect` bridge
-(it answers the 402s under a budget), either via the CLI:
+**Option B — register the endpoint directly:** drop the `mcp.servers` block from
+[`openclaw.json`](./openclaw.json) into `~/.openclaw/openclaw.json`, or run:
 
 ```bash
 openclaw mcp add tiagoh \
-  --command npx \
-  --arg tiagoh --arg connect --arg http://localhost:4402/mcp \
-  --env TIAGOH_KEY_PATH=./agent.pem \
-  --env TIAGOH_MAX_SESSION=5000000000 \
-  --env GOAT_RPC_URL=https://rpc.testnet3.goat.network
+  --url https://tiagoh.vercel.app/api/mcp \
+  --transport streamable-http
 ```
 
-…or by dropping the config in `~/.openclaw/openclaw.json` — see [`openclaw.json`](./openclaw.json).
-
-**3. Add the skill** so the agent uses paid tools wisely (budget, reputation, disputes): copy
+**Add the skill** so the agent uses paid tools wisely (budget, reputation, disputes): copy
 [`skills/tiagoh-payments.md`](./skills/tiagoh-payments.md) into your OpenClaw skills directory.
-
-**4. Deploy on ClawUp** — push the same agent config (MCP server + skill) to your ClawUp workspace
-to launch the agent in seconds on GOAT-secured infrastructure.
 
 ## Result
 
-Your ClawUp/OpenClaw agent can now say *"analyze this DeFi position"* and autonomously buy the paid
-tiagoh tools it needs — market data, RWA prices, yields, a composite analysis — paying per call over
-x402 under a fixed budget, with every receipt anchored on GOAT and bad outputs refundable via
-tiagoh's dispute + quality-bond layer.
+Your ClawUp/OpenClaw agent can now say *"analyze this DeFi position"* and autonomously call the paid
+tiagoh tools it needs — priced per call over x402, with every receipt anchored on GOAT and bad
+outputs refundable via tiagoh's dispute + quality-bond layer.

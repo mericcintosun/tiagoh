@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
 import { TIAGOH, TiagohConfigSchema, type TiagohConfig } from "@tiagoh/core";
 import { TiagohGateway } from "@tiagoh/gateway";
-import { BudgetGuard, listPaidTools, callPaidTool } from "@tiagoh/client";
+import { BudgetGuard, listPaidTools, callPaidTool, startStdioBridge } from "@tiagoh/client";
 
 const program = new Command();
 program
@@ -67,13 +67,25 @@ program
     console.log(`  priced tools: ${config.tools.map((t) => `${t.name}($${t.priceUsd})`).join(", ")}`);
   });
 
-// ── connect: call a paid tool on a gateway, answering 402 under budget ───────
+// ── connect: stdio bridge so an MCP host can call a paid gateway ─────────────
 program
   .command("connect")
   .argument("<gatewayUrl>", "base URL of a paid tiagoh gateway")
+  .description("stdio bridge: expose a paid gateway's tools to an MCP host, paying x402 under a budget")
+  .action(async (gatewayUrl: string) => {
+    // NOTE: speaks MCP over stdout — do not print anything here.
+    const budget = new BudgetGuard(Number(process.env.TIAGOH_MAX_SESSION ?? "5"));
+    const sign = async (c: { priceUsd: number }) => `sig:${c.priceUsd}`;
+    await startStdioBridge({ gatewayUrl, budget, sign, payer: "mcp-host" });
+  });
+
+// ── call: one-shot paid tool call (or list) from the terminal ───────────────
+program
+  .command("call")
+  .argument("<gatewayUrl>", "base URL of a paid tiagoh gateway")
   .argument("[tool]", "tool to call (omit to list priced tools)")
   .argument("[argsJson]", "JSON arguments for the tool", "{}")
-  .description("discover or call paid tools on a gateway, paying x402 under a budget")
+  .description("call or list paid tools once, paying x402 under a budget")
   .action(async (gatewayUrl: string, tool: string | undefined, argsJson: string) => {
     if (!tool) {
       const tools = await listPaidTools(gatewayUrl);

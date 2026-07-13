@@ -101,7 +101,7 @@ tiagoh = **the monetization core** + **five trust features (the gap we researche
 | ID | Feature | Requirement |
 | --- | --- | --- |
 | C1 | **Wrap** (`tiagoh wrap`) | Put an x402 paywall in front of any existing MCP server, unchanged. Per-tool price advertised in `tools/list` (`_meta.tiagoh.priceUsd`). |
-| C2 | **Connect** (`tiagoh connect`) | a paying client/CLI so any agent or MCP host calls paid servers, answering 402 challenges automatically under a spending budget. OpenClaw/ClawUp agents consume the hosted MCP endpoint (see `examples/openclaw`). |
+| C2 | **Connect** (`tiagoh connect`) | stdio bridge so any local MCP host (Claude Code, Claude Desktop, Cursor) calls paid servers, answering 402 challenges automatically under a spending budget (free to run — only x402 micropayments to the seller). `tiagoh call` is a one-shot variant; OpenClaw/ClawUp agents use the hosted MCP endpoint (see `examples/openclaw`). |
 | C3 | **Cascade** | When a paid tool buys from other paid tools, compose payments into a linked tree (see 5.3). |
 | C4 | **Charge-on-success** | The gateway settles payment **only if the tool call succeeds**; a failed call is never billed. |
 | C5 | **On-chain receipts** | Every settled call anchored with its cascade `parentId`; the full graph reconstructs from chain data alone. |
@@ -262,7 +262,7 @@ ecosystem** (highest novelty, 8/10). Price *comparison* (Bazaar) exists on Base;
 | --- | --- |
 | `packages/core` | Shared types, config schema, receipt + payment-graph + bond/dispute/auction models |
 | `packages/gateway` | Seller-side proxy: wrap, price, x402 flow, charge-on-success, bond/escrow/auction hooks |
-| `packages/client` | Buyer-side paying `fetch`: budget guard, cascade parent propagation, stdio bridge, refund handling |
+| `packages/client` | Buyer-side paying `fetch`: budget guard, cascade parent propagation, stdio bridge, paid-tool caller, refund handling |
 | `packages/agent` | Autonomous Claude buyer: prices, budgets, buys, reads reputation, disputes bad output |
 | `packages/cli` | `tiagoh` CLI — `init` / `wrap` / `connect` |
 | `contracts` | Solidity (Foundry): all contracts in §5, ERC-8004 integration, BitVM2 arbitration hook, tests |
