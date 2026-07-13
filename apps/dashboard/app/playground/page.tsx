@@ -40,7 +40,7 @@ export default function PlaygroundPage() {
   const [budget, setBudget] = React.useState(5);
   const [hops, setHops] = React.useState<Hop[]>(INITIAL);
 
-  // Sequential budget check — mirrors CascadeController: a hop that would exceed the
+  // Sequential budget check, mirrors CascadeController: a hop that would exceed the
   // remaining root budget is refused on-chain (BudgetExceeded), preserving parents.
   const evaluated = React.useMemo(() => {
     let spent = 0;
@@ -75,7 +75,7 @@ export default function PlaygroundPage() {
       <PageHeading
         eyebrow="Playground"
         title="Interactive cascade"
-        description="Open a root budget, tune each hop, and watch the contract refuse any hop that would blow the cap — then refund the remainder on close."
+        description="Open a root budget, tune each hop, and watch the contract refuse any hop that would blow the cap, then refund the remainder on close."
         source="stub"
         action={
           <Button onClick={settle} size="sm">
@@ -185,8 +185,8 @@ export default function PlaygroundPage() {
 
                 {!h.settled && (
                   <p className="mt-3 text-xs text-destructive">
-                    Refused on-chain — this hop would exceed the remaining root budget;
-                    parents are preserved.
+                    Refused on-chain: this hop would exceed the remaining root budget.
+                    Parents are preserved.
                   </p>
                 )}
               </CardContent>

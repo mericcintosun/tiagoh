@@ -29,7 +29,7 @@ export default function DisputesPage() {
       <PageHeading
         eyebrow="Dispute center"
         title="Arbitration & atomic refunds"
-        description="When a hop underdelivers, a dispute rolls the cascade back atomically — bond slashed, buyer refunded, splits reversed, reputation updated. BitVM2 is the trust-minimized upgrade path."
+        description="When a hop underdelivers, a dispute rolls the cascade back atomically: bond slashed, buyer refunded, splits reversed, reputation updated. BitVM2 is the trust-minimized upgrade path."
         source={disputes.source}
       />
 

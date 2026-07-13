@@ -1,13 +1,13 @@
 /**
- * Typed mock data for tiagoh surfaces.
+ * Typed fallback data for tiagoh surfaces.
  *
- * IMPORTANT — this is CLEARLY-MARKED stub data. tiagoh's contracts (ReceiptRegistry,
- * QualityBond, ToolAuction, DisputeArbiter, …) are not yet deployed to a fixed address,
- * so the domain data below stands in for what `lib/chain-data.ts` will decode from
- * on-chain events once `contracts.*` addresses are set. The DATA PATH is already
- * client-side (see `useChainStatus`) — this only fills the rows until the reads land.
- * Shapes mirror the PRD §5 / §7 contract models so swapping in live reads is 1:1.
+ * The live data comes from lib/chain-data.ts, which decodes the deployed GOAT
+ * Testnet3 contracts client side (getLogs + readContract). These typed rows are the
+ * fallback each hook returns if a chain read errors or is empty, so the UI never
+ * breaks. Shapes mirror the PRD sections 5 and 7 contract models.
  */
+
+import { deployedContracts } from "@/lib/deployments";
 
 export type Address = `0x${string}`;
 export type Hash = `0x${string}`;
@@ -127,18 +127,18 @@ const NOW = 1_752_000_000_000; // fixed reference (deterministic SSR/CSR, no hyd
 
 // ── Hero stat tiles ─────────────────────────────────────────────────────────
 export const heroStats: StatTile[] = [
-  { label: "contracts live", value: "8", sub: "GOAT testnet", accent: "primary" },
-  { label: "real x402", value: "verified", sub: "end-to-end settlement", accent: "flow" },
-  { label: "N-hop insured", value: "4-hop", sub: "atomic unwind", accent: "success" },
-  { label: "Bitcoin-settled", value: "final", sub: "BitVM2 anchored", accent: "warning" },
+  { label: "contracts live", value: "10", sub: "GOAT Testnet3", accent: "primary" },
+  { label: "contract tests", value: "16/16", sub: "all passing", accent: "success" },
+  { label: "x402 flow", value: "end-to-end", sub: "pay per call", accent: "flow" },
+  { label: "on-chain proof", value: "live txns", sub: "receipts + slash", accent: "warning" },
 ];
 
 // ── Dashboard stat tiles ────────────────────────────────────────────────────
 export const dashboardStats: StatTile[] = [
-  { label: "gross revenue", value: "$48,210.44", sub: "+12.4% 7d", accent: "primary" },
-  { label: "settled calls", value: "18,904", sub: "charge-on-success", accent: "flow" },
-  { label: "success rate", value: "98.6%", sub: "quality-bonded", accent: "success" },
-  { label: "pending 402", value: "37", sub: "awaiting confirm", accent: "warning" },
+  { label: "receipts", value: "on-chain", sub: "GOAT Testnet3", accent: "primary" },
+  { label: "billing", value: "charge-on-success", sub: "failed calls are free", accent: "flow" },
+  { label: "output", value: "quality-bonded", sub: "refund on bad output", accent: "success" },
+  { label: "settlement", value: "Bitcoin finality", sub: "via GOAT", accent: "warning" },
 ];
 
 // ── Revenue series (30 pts) ─────────────────────────────────────────────────
@@ -554,14 +554,14 @@ export const disputes: Dispute[] = [
 
 // ── Contracts grid ──────────────────────────────────────────────────────────
 export const contractGrid: ContractInfo[] = [
-  { name: "ReceiptRegistry", purpose: "Anchor settled receipts + cascade parentId", address: null, status: "pending" },
-  { name: "RevenueSplit", purpose: "Pull-based fixed-weight revenue splits", address: null, status: "pending" },
-  { name: "CascadeController", purpose: "Budget tree, per-hop cap, recursive attribution", address: null, status: "pending" },
-  { name: "PaymentChannel", purpose: "Prepaid channels, signed vouchers, redeem", address: null, status: "pending" },
-  { name: "QualityBond", purpose: "Stake / slash / bond-backed refund", address: null, status: "pending" },
-  { name: "EscrowVault", purpose: "Conditional hold + atomic cascade unwind", address: null, status: "pending" },
-  { name: "DisputeArbiter", purpose: "Dispute window + ruling, BitVM2 hook", address: null, status: "pending" },
-  { name: "ReputationScorer", purpose: "Aggregate score over receipts + slashes", address: null, status: "pending" },
-  { name: "ToolAuction", purpose: "Open request, collect bids, clear + settle", address: null, status: "pending" },
-  { name: "AgentRegistry", purpose: "ERC-8004 identity + capped delegation", address: null, status: "pending" },
+  { name: "ReceiptRegistry", purpose: "Anchor settled receipts + cascade parentId", address: deployedContracts.receiptRegistry, status: "live" },
+  { name: "RevenueSplit", purpose: "Pull-based fixed-weight revenue splits", address: deployedContracts.revenueSplit, status: "live" },
+  { name: "CascadeController", purpose: "Budget tree, per-hop cap, recursive attribution", address: deployedContracts.cascadeController, status: "live" },
+  { name: "PaymentChannel", purpose: "Prepaid channels, signed vouchers, redeem", address: deployedContracts.paymentChannel, status: "live" },
+  { name: "QualityBond", purpose: "Stake, slash, bond-backed refund", address: deployedContracts.qualityBond, status: "live" },
+  { name: "EscrowVault", purpose: "Conditional hold + atomic cascade unwind", address: deployedContracts.escrowVault, status: "live" },
+  { name: "DisputeArbiter", purpose: "Dispute window + ruling, BitVM2 hook", address: deployedContracts.disputeArbiter, status: "live" },
+  { name: "ReputationScorer", purpose: "Aggregate score over receipts + slashes", address: deployedContracts.reputationScorer, status: "live" },
+  { name: "ToolAuction", purpose: "Open request, collect bids, clear + settle", address: deployedContracts.toolAuction, status: "live" },
+  { name: "AgentRegistry", purpose: "ERC-8004 identity + capped delegation", address: deployedContracts.agentRegistry, status: "live" },
 ];

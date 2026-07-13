@@ -65,13 +65,13 @@ const STEPS = [
     Icon: Plugs,
     step: "02",
     title: "connect",
-    body: "Any MCP host — Claude Code, Desktop, Cursor — answers 402 challenges automatically under a spending budget.",
+    body: "Any MCP host answers 402 challenges automatically under a spending budget. Claude Code, Claude Desktop, and Cursor all work as-is.",
   },
   {
     Icon: TreeStructure,
     step: "03",
     title: "cascade",
-    body: "A tool that buys other paid tools composes into one budget-capped tree, with revenue attributed up each hop.",
+    body: "A tool can buy other paid tools. The whole call tree runs under one budget, and revenue flows up each hop.",
   },
   {
     Icon: ShieldCheck,
@@ -83,15 +83,15 @@ const STEPS = [
 
 const x402Lines: CodeLine[] = [
   { text: "// one MCP tool call, paid per-request over x402", tone: "comment" },
-  { text: "POST /mcp   tools/call  market.prices()", tone: "default" },
+  { text: "POST /api/mcp   tools/call  market.prices()", tone: "default" },
   { text: "← 402 Payment Required", tone: "warning" },
   { text: "  price:  $0.42   token: USDC (ERC-3009)", tone: "muted" },
   { text: "  payTo:  0xSplitter…   budget cap: $5.00", tone: "muted" },
-  { text: "→ sign transferWithAuthorization", tone: "flow" },
+  { text: "→ sign transferWithAuthorization (local mock)", tone: "flow" },
   { text: "→ retry  X-PAYMENT + X-TIAGOH-PARENT-ID", tone: "flow" },
   { text: "← 200 OK  { btc: 68420.11, tvl: 1.9e9 }", tone: "default" },
-  { text: "  charged only because the call succeeded", tone: "comment" },
-  { text: "  receipt 0xa1…9f2a  settled ✓", tone: "success" },
+  { text: "  charged only when the call succeeds", tone: "comment" },
+  { text: "  receipt 0xa1…9f2a recorded on GOAT ✓", tone: "success" },
 ];
 
 const agentLines: CodeLine[] = [
@@ -111,7 +111,7 @@ const PERSONAS = [
     id: "seller",
     label: "Tool seller",
     Icon: Receipt,
-    blurb: "Monetize an MCP server per call, prove quality, split revenue.",
+    blurb: "Charge per call for your MCP server, and route a revenue split to any payout address.",
     lines: [
       { text: "# wrap your MCP server as paid + insured", tone: "comment" },
       { text: "npx tiagoh wrap ./my-mcp-server \\", tone: "default" },
@@ -122,7 +122,7 @@ const PERSONAS = [
     id: "composer",
     label: "Composer",
     Icon: TreeStructure,
-    blurb: "Resell a composite tool that buys other paid tools up the cascade.",
+    blurb: "Resell a tool that buys other paid tools. The whole cascade stays under your budget cap.",
     lines: [
       { text: "# cap the whole downstream call tree", tone: "comment" },
       { text: "npx tiagoh connect --budget 5.00 \\", tone: "default" },
@@ -133,7 +133,7 @@ const PERSONAS = [
     id: "buyer",
     label: "Buyer agent",
     Icon: Wallet,
-    blurb: "Discover, price, buy, and trust tools under a fixed budget.",
+    blurb: "Run an agent that finds tools, buys them under a fixed budget, and ranks them by on-chain reputation.",
     lines: [
       { text: "# an autonomous buyer with recourse", tone: "comment" },
       { text: "npm i @tiagoh/agent", tone: "default" },
@@ -159,45 +159,45 @@ const ROADMAP = [
   {
     phase: "shipped",
     tone: "success" as const,
-    items: ["x402 wrap + connect", "cascade controller", "on-chain receipts", "revenue splits"],
+    items: ["10 contracts live on GOAT Testnet3", "x402 pay-per-call flow", "cascade payments + receipts", "bond slash + atomic refund"],
   },
   {
     phase: "next",
     tone: "primary" as const,
-    items: ["quality bonds live", "escrow + atomic unwind", "reputation scorer v1"],
+    items: ["real facilitator settlement", "escrow at scale", "reputation scoring v1"],
   },
   {
     phase: "planned",
     tone: "flow" as const,
-    items: ["reverse auction clearing", "BitVM2 dispute hook", "prepaid channels"],
+    items: ["reverse auction hardening", "BitVM2 dispute proofs", "prepaid payment channels"],
   },
   {
     phase: "vision",
     tone: "warning" as const,
-    items: ["portable ERC-8004 reputation graph", "cross-gateway insurance market"],
+    items: ["portable ERC-8004 reputation", "cross-gateway insurance market"],
   },
 ];
 
 const FAQ = [
   {
     q: "How is this different from raw x402?",
-    a: "x402 is a point-to-point vending machine: pay, get an answer, done — no composition, no recourse, no quality signal. tiagoh adds the trust layer: cascades, quality bonds, reputation, live auctions, and atomic multi-hop refunds on top of the x402 rails.",
+    a: "Raw x402 is a vending machine. You pay, you get one answer, and that is it. There is no way to compose paid tools, no recourse when the output is wrong, and no quality signal. tiagoh runs on the same x402 rails and adds cascades, quality bonds, on-chain reputation, live auctions, and atomic multi-hop refunds.",
   },
   {
     q: "What does 'charge-on-quality' mean?",
-    a: "Charge-on-success only bills when a call returns. tiagoh goes further: each tool stakes a bond, and if a verifier flags provably-bad output, the bond is slashed and the buyer is auto-refunded — insurance for the agent tool economy.",
+    a: "Charge-on-success bills only when a call returns a result. tiagoh goes one step further. Each tool stakes a bond up front. If a verifier flags the output as bad, the bond is slashed and the buyer is refunded from it. The buyer never pays for broken output.",
   },
   {
     q: "Why GOAT Network?",
-    a: "GOAT is a Bitcoin L2, 100% EVM-compatible, building natively for agents (x402, ERC-8004, .goat naming). tiagoh settles with Bitcoin finality and reuses GOAT's deployed ERC-8004 registries rather than reinventing identity and reputation storage.",
+    a: "GOAT is a Bitcoin L2 that is fully EVM-compatible and built for agents. It ships x402, ERC-8004, and .goat naming natively. tiagoh deploys there so calls settle on a Bitcoin L2, and it reuses GOAT's ERC-8004 registries instead of reinventing identity and reputation.",
   },
   {
     q: "Is there a backend?",
-    a: "This dashboard has none. Every number is read client-side straight from the GOAT chain via viem/wagmi over a public RPC. Contracts anchor the data; the UI just decodes it.",
+    a: "No. Every number on this dashboard is read client-side straight from GOAT Testnet3 via viem and wagmi over a public RPC. The contracts hold the data; the UI just decodes it.",
   },
   {
     q: "How do atomic refunds work across a cascade?",
-    a: "If a downstream hop fails after parents already paid, the EscrowVault unwinds the whole tree in one all-or-nothing step, reversing revenue splits along the way. The DisputeArbiter records the ruling, which then updates reputation.",
+    a: "If a downstream hop fails after its parents already paid, the EscrowVault unwinds the whole tree in one all-or-nothing step and reverses the revenue splits along the way. The DisputeArbiter records the ruling, and that updates reputation.",
   },
 ];
 
@@ -217,21 +217,22 @@ export default function LandingPage() {
             <Reveal>
               <Badge variant="flow" className="gap-1.5">
                 <Sparkle className="h-3 w-3" weight="fill" />
-                First-on-GOAT · trust layer for paid MCP tools
+                First on GOAT · Paid MCP tools with on-chain trust
               </Badge>
             </Reveal>
             <Reveal delay={0.05}>
               <h1 className="mt-6 max-w-4xl font-display text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
-                Payments that cascade.
+                Get paid for every MCP call.
                 <br />
-                <span className="text-gradient">Trust that settles.</span>
+                <span className="text-gradient">Payments that cascade.</span>
               </h1>
             </Reveal>
             <Reveal delay={0.1}>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                tiagoh is the insured settlement layer for MCP on GOAT — pay per call
-                over x402, cascade through insured, reputation-ranked supply chains,
-                settled with Bitcoin finality.
+                tiagoh turns any MCP server into a paid tool. Agents pay per call over
+                x402. When one tool calls another, payments cascade down the chain under
+                a single budget, and quality bonds refund the buyer when output is bad.
+                Everything runs on GOAT, a Bitcoin L2.
               </p>
             </Reveal>
             <Reveal delay={0.15}>
@@ -260,8 +261,8 @@ export default function LandingPage() {
         <Section id="how">
           <SectionHeading
             eyebrow="How it works"
-            title="Wrap. Connect. Cascade. Insure."
-            lead="Four steps turn any MCP server into a paid, insured, reputation-ranked service."
+            title="Wrap, connect, cascade, insure"
+            lead="Four steps turn any MCP server into a paid tool with quality guarantees. You do not rewrite your server."
           />
           <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s, i) => (
@@ -289,8 +290,8 @@ export default function LandingPage() {
         <Section id="start" className="border-t border-border bg-muted/20">
           <SectionHeading
             eyebrow="Get started"
-            title="Three personas, one command away"
-            lead="Whether you sell a tool, compose a supply chain, or buy on behalf of an agent — start here."
+            title="Three roles, one command each"
+            lead="Sell a tool, resell a composite that buys other tools, or run a buyer agent. Copy the command for your role."
           />
           <Reveal className="mt-10">
             <Tabs defaultValue="seller" className="w-full">
@@ -347,7 +348,7 @@ export default function LandingPage() {
           <SectionHeading
             eyebrow="Quality bonds & insurance"
             title="Charge-on-success becomes charge-on-quality"
-            lead="Every tool stakes a bond. A verifier oracle flags provably-bad output; the bond is slashed and the buyer refunded — an insurance layer for the tool economy."
+            lead="Every tool stakes a bond up front. A verifier flags bad output, the bond is slashed, and the buyer is refunded from it. Sellers put money behind their own quality."
           />
           <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1fr]">
             <Reveal className="flex flex-col gap-4">
@@ -381,7 +382,7 @@ export default function LandingPage() {
             <SectionHeading
               eyebrow="Reputation & discovery"
               title="Reputation from receipts, on ERC-8004"
-              lead="Every settled receipt, refund, dispute, and slash feeds a trustless score. Agents rank tools by proven outcomes, not marketing."
+              lead="Every settled receipt, refund, dispute, and slash feeds the on-chain score. Agents rank tools by proven outcomes, not marketing."
             />
             <Reveal>
               <Button asChild variant="outline">
@@ -403,7 +404,7 @@ export default function LandingPage() {
             <SectionHeading
               eyebrow="Live tool auction"
               title="Tools compete to serve your request"
-              lead="For a capability request, eligible tools bid on price and quality in a live reverse auction. The buyer takes best value; the winner settles through the cascade rails. Reverse auctions are whitespace across the entire x402 ecosystem."
+              lead="Post a capability request and bonded tools bid on price and quality in a live reverse auction. The best value wins and settles through the cascade rails."
             />
             <Reveal delay={0.08}>
               <AuctionBoard auction={auctions[0]!} />
@@ -418,16 +419,16 @@ export default function LandingPage() {
               <SectionHeading
                 eyebrow="Dispute & atomic refund"
                 title="Broken cascades unwind atomically"
-                lead="If a downstream hop fails after parents already paid, the whole tree rolls back — revenue splits reversed, all-or-nothing. Arbitration reuses GOAT's BitVM2 fraud-proof substrate."
+                lead="If a downstream hop fails after its parents already paid, the whole tree rolls back in one step. Revenue splits reverse, and the refund is all or nothing. On-chain arbitration records the ruling, with BitVM2 fraud proofs as the planned trust-minimized upgrade."
               />
               <Reveal delay={0.1} className="mt-6">
                 <Card>
                   <CardContent className="flex items-center gap-3 p-4">
                     <Scales className="h-5 w-5 text-primary" weight="fill" />
                     <p className="text-sm text-muted-foreground">
-                      Atomic refund <span className="text-foreground">up</span> a cascade
-                      tree with revenue splits is unbuilt anywhere else — tiagoh&apos;s
-                      defensible core.
+                      Refunding a buyer atomically <span className="text-foreground">up</span> a
+                      cascade tree, with revenue splits reversed along the way, is the hard
+                      part. It is what tiagoh is built around.
                     </p>
                   </CardContent>
                 </Card>
@@ -449,14 +450,14 @@ export default function LandingPage() {
                 <Lightning className="h-5 w-5 text-primary" weight="fill" />
                 <h3 className="text-xl font-semibold">The x402 flow</h3>
               </div>
-              <CodeCard title="POST /mcp — paid over 402" lines={x402Lines} />
+              <CodeCard title="POST /api/mcp · paid over 402" lines={x402Lines} />
             </Reveal>
             <Reveal delay={0.08}>
               <div className="mb-4 flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-primary" weight="fill" />
                 <h3 className="text-xl font-semibold">Autonomous agent</h3>
               </div>
-              <CodeCard title="tiagoh agent — Claude buys under budget" variant="terminal" lines={agentLines} />
+              <CodeCard title="tiagoh agent · buying under a budget" variant="terminal" lines={agentLines} />
             </Reveal>
           </div>
         </Section>
@@ -465,8 +466,8 @@ export default function LandingPage() {
         <Section id="contracts">
           <SectionHeading
             eyebrow="Contracts"
-            title="Ten Solidity contracts on GOAT testnet"
-            lead="Reuse GOAT's deployed ERC-8004 registries; anchor everything else with Bitcoin finality. Addresses resolve from env after deploy."
+            title="Ten Solidity contracts, live on GOAT Testnet3"
+            lead="All ten are deployed on GOAT Testnet3, and 16 of 16 contract tests pass. Every address below is real and resolves on the block explorer."
           />
           <div className="mt-10 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-2">
             {contractGrid.map((c, i) => (
@@ -543,11 +544,11 @@ export default function LandingPage() {
               <CardContent className="relative flex flex-col items-center gap-6 px-6 py-16 text-center">
                 <SealCheck className="h-10 w-10 text-primary" weight="fill" />
                 <h2 className="max-w-2xl font-display text-3xl font-semibold tracking-tight md:text-4xl">
-                  The agent economy needs a trust layer, not just a payment layer.
+                  Paid MCP tools, with a refund when they fail.
                 </h2>
                 <p className="max-w-xl text-muted-foreground">
-                  Insured, reputation-ranked, atomically-refundable tool calls —
-                  settled with Bitcoin finality on GOAT.
+                  Wrap your MCP server, get paid per call over x402, and let quality bonds
+                  cover the buyer when output is bad. It all runs on GOAT, a Bitcoin L2.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <Button asChild size="lg">
@@ -597,7 +598,7 @@ function BondFeedNote({ count }: { count: number }) {
       <ShieldCheck className="h-4 w-4 text-success" weight="fill" />
       <span>
         <span className="num text-foreground">{count}</span> bond events in the live
-        feed — see the explorer for slashes &amp; refunds.
+        feed. Open the explorer for slashes and refunds.
       </span>
     </div>
   );

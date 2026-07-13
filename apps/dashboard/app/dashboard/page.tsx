@@ -21,7 +21,7 @@ export default function DashboardPage() {
       <PageHeading
         eyebrow="Seller dashboard"
         title="Revenue, receipts & the cascade graph"
-        description="Live earnings from paid MCP tool calls — settled on GOAT with Bitcoin finality, read client-side straight from chain."
+        description="Live earnings from paid MCP tool calls, settled on GOAT and read client-side straight from chain."
         source={revenue.source}
       />
 

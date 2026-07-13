@@ -25,7 +25,7 @@ export default function ExplorerPage() {
       <PageHeading
         eyebrow="Explorer"
         title="Reputation leaderboard & bond feed"
-        description="Tools ranked by proven usage and outcome quality — every score traces to the on-chain receipts and slashes that produced it."
+        description="Tools ranked by proven usage and outcome quality. Every score traces to the on-chain receipts and slashes that produced it."
         source={leaderboard.source}
       />
 

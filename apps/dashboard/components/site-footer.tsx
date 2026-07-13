@@ -43,8 +43,8 @@ export function SiteFooter() {
         <div className="flex flex-col gap-3">
           <Logo />
           <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-            The insured settlement &amp; trust layer for the agent economy — paid MCP
-            tools that cascade, insure, and settle with Bitcoin finality on GOAT.
+            Paid MCP tools on GOAT. Agents pay per call over x402, payments cascade
+            across tool chains, and quality bonds refund bad output.
           </p>
           <span className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
             <CurrencyBtc className="h-4 w-4 text-primary" weight="fill" />
@@ -74,7 +74,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-6 py-6 text-xs text-muted-foreground sm:flex-row">
-          <span className="font-mono">tiagoh — testnet build · v0.1</span>
+          <span className="font-mono">tiagoh testnet build · v0.1</span>
           <span>Numbers anchored on-chain. Read client-side, no backend.</span>
         </div>
       </div>
