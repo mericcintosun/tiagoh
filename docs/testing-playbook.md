@@ -22,7 +22,7 @@ pnpm contracts:setup      # fetches forge-std, OpenZeppelin, erc-8004 into contr
 pnpm contracts:test       # forge test
 ```
 
-Expected: `16 passed; 0 failed`. Covers receipts and dedupe, the cascade budget tree with an on chain
+Expected: `23 passed; 0 failed`. Covers receipts and dedupe, the cascade budget tree with an on chain
 `BudgetExceeded` rejection, payment channel vouchers, quality bond slash to buyer, and the escrow and
 dispute recourse path.
 

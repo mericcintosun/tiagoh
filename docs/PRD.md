@@ -293,6 +293,8 @@ Opus 4.8 for the autonomous buyer.
 | `ReputationScorer` | Aggregate score over ERC-8004 signals + receipts + slashes (§5.1) |
 | `ToolAuction` | Open request, collect bids, clear by policy, settle winner (§5.5) |
 | `AgentRegistry` | ERC-8004 identity binding + capped spend delegation via ERC-4337 session keys (§5.3) |
+| `SessionKeyDelegator` | ERC-4337 session-key enforcement for capped sub-budgets: signature-gated, nonce-protected, cap-enforced spend (§5.3). Source + tests; not deployed |
+| `BitVM2Arbiter` | optimistic dispute arbitration with a BitVM2 fraud-proof escalation; drop-in `IDisputeArbiter` (§5.4). Source + tests; not deployed |
 
 Reuse GOAT's deployed **ERC-8004** registries (identity / reputation / validation) rather than
 re-implementing storage.

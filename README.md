@@ -26,8 +26,9 @@ not marketing. Everything settles on GOAT Network with Bitcoin finality.
 
 ## What is live right now
 
-- **10 Solidity contracts on GOAT Testnet3**, 16 of 16 tests passing, each exercised with real
-  transactions. See [DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
+- **10 Solidity contracts on GOAT Testnet3**, each exercised with real transactions, plus an
+  ERC-4337 session-key enforcer and a BitVM2 optimistic arbiter in source. 23 of 23 tests passing.
+  See [DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
 - **End to end x402 flow**: gateway answers 402, the client pays under budget, the tool runs, and only
   a successful call is billed. Run it with `pnpm --filter @tiagoh/e2e demo`.
 - **Autonomous buyer** that reads reputation, pays per call, verifies each output, and disputes bad
@@ -65,7 +66,7 @@ TIAGOH_ONCHAIN=1 PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e demo
 pnpm --filter @tiagoh/e2e agent
 
 # Contracts
-pnpm contracts:setup && pnpm contracts:test    # 16/16
+pnpm contracts:setup && pnpm contracts:test    # 23/23
 ```
 
 Full reviewer path: [docs/testing-playbook.md](docs/testing-playbook.md).
