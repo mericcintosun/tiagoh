@@ -22,7 +22,7 @@ pnpm contracts:setup      # fetches forge-std, OpenZeppelin, erc-8004 into contr
 pnpm contracts:test       # forge test
 ```
 
-Expected: `23 passed; 0 failed`. Covers receipts and dedupe, the cascade budget tree with an on chain
+Expected: `28 passed; 0 failed`. Covers receipts and dedupe, the cascade budget tree with an on chain
 `BudgetExceeded` rejection, payment channel vouchers, quality bond slash to buyer, and the escrow and
 dispute recourse path.
 
@@ -78,7 +78,7 @@ Open [tiagoh.vercel.app](https://tiagoh.vercel.app). It reads the deployed contr
 no backend:
 
 - `/dashboard`: live receipt count and the cascade graph
-- `/explorer`: a receipt driven leaderboard and the 10 contracts with explorer links
+- `/explorer`: a receipt driven leaderboard and the 13 contracts with explorer links
 - `/auction`: the cleared reverse auction (winner, price, bids)
 - `/disputes`: the dispute that was ruled for the buyer and refunded
 

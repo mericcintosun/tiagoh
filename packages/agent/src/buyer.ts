@@ -14,6 +14,12 @@ export interface BuyerOptions {
   verify?: Verifier;
   /** Called when a paid output is disputed (opens an on-chain dispute → refund + slash). */
   dispute?: (args: { tool: string; reason: string }) => Promise<void>;
+  /**
+   * Called after each verified outcome to record reputation from settlement facts — a passing
+   * output is `success`, a disputed one is `dispute`. Wire it to `createOnchainReputation(...)`
+   * to write ERC-8004 feedback on-chain; omit it (the demo default) to stay gas-free.
+   */
+  feedback?: (args: { tool: string; outcome: "success" | "dispute" }) => Promise<void>;
 }
 
 export interface BuyerResult {
@@ -58,9 +64,11 @@ export async function runBuyer(opts: BuyerOptions): Promise<BuyerResult> {
       const verdict = await verifier.verify({ tool: name, args: {}, output });
       if (verdict.ok) {
         purchased[name] = output;
+        await opts.feedback?.({ tool: name, outcome: "success" });
       } else {
         disputed.push(name);
         await opts.dispute?.({ tool: name, reason: verdict.reason ?? "bad output" });
+        await opts.feedback?.({ tool: name, outcome: "dispute" });
         budget.refund(tool.priceUsd); // disputed → refunded
       }
     } catch (err) {

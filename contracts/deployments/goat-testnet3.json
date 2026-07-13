@@ -10,6 +10,9 @@
     "RevenueSplit_tokenBound": "0x86f0e965e12b7db3b27b78341420a266aff8c943"
   },
   "liveProofs": {
+    "sessionKeyDelegator": "grant(sk, cap 1000) -> off-key signed spend 400 (recovers sk on-chain) -> remaining 600",
+    "bitVM2Arbiter": "recourse wired to QualityBond+EscrowVault; openDispute -> propose(forBuyer) -> rule -> RULED (DisputeRuled + RecourseExecuted)",
+    "erc8004Reputation": "registerAgent(tool) -> agentId 1; giveFeedback(+100 'tiagoh'/'success') -> getSummary count 1, sumWad 1e20",
     "receipts": "5 anchored; fan-out childCount[root]=3; multi-level root->child->grandchild (depth 3); totalVolume=170000",
     "cascadeController": "open(1000) -> analyst 100 -> data 30 @20% attr (analyst+6/data+24) -> over-budget BudgetExceeded -> close refunds 870",
     "qualityBond": "BRONZE bond 1000 staked -> arbiter slash 300 to buyer -> bondAmount 700",
@@ -31,6 +34,9 @@
     "DisputeArbiter":    { "address": "0x0b592E60706695Dc1E84bFda4f2ec59dc660e980", "tx": "0x905c9d44dc60557a374e22e4e64a619d1e0afa38ea4578a6c00e814b9d546caf" },
     "ReputationScorer":  { "address": "0x10d7eC7fEbCB3009e2842B35616eA1609249C695", "tx": "0x0d26518a484c36f49c466ea48e9e9e3ff54da8de5ec8750a59d396bd8f66c1d4" },
     "ToolAuction":       { "address": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7", "tx": "0xea3bee26687a5df8556c0dfccd881b4e5e2271348480e4a4376bb23be5bd8cd6" },
-    "AgentRegistry":     { "address": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215", "tx": "0x47f4a57dfe2a101f119da2b301af9068039e1b98df7c4d4c362c38bd23abfb7b" }
+    "AgentRegistry":     { "address": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215", "tx": "0x47f4a57dfe2a101f119da2b301af9068039e1b98df7c4d4c362c38bd23abfb7b" },
+    "SessionKeyDelegator":       { "address": "0x24Df4B7f3ECd1c5692D1e8FC91d46e119c355555", "tx": "0x2fd47d11652a10b2b22db883800129f65f8e8d338618e74ad258f71f88b3f57a" },
+    "BitVM2Arbiter":             { "address": "0x35aD6433d2e532c0938D79353F6882f68F2d36D2", "tx": "0x8b7898aac5da5708ec7914e8f8aa936bf8e5d234abd4137ba52cec76aac0f44d" },
+    "ERC8004ReputationRegistry": { "address": "0x59ABEE0BA201E99AEAa2E80141D291e2ac4a88A2", "tx": "0x35f2aa4037ffb331c023ad401788dee4d8046b83c55dbdf20faee0c13dfcec52" }
   }
 }

@@ -32,6 +32,12 @@ export interface OnchainSettleOptions {
   /** wei; GOAT testnet enforces a minimum priority fee (~130000). */
   priorityGasPrice?: bigint;
   maxGasPrice?: bigint;
+  /**
+   * Optional hook run after a receipt is anchored, on the same serialized queue (so it never
+   * races the next settle's nonce). Use it to auto-split revenue to upstream providers — pass
+   * `createRevenueSplitRelease(...)` when the wrapped tool's payee is a RevenueSplit.
+   */
+  postSettle?: (result: { txHash: string; payee: Address; paymentId: string }) => Promise<unknown>;
 }
 
 /**
@@ -77,6 +83,14 @@ export function createOnchainSettle(opts: OnchainSettleOptions) {
         maxFeePerGas: maxFee,
       });
       await pub.waitForTransactionReceipt({ hash });
+      // Optional post-settle step (e.g. RevenueSplit auto-split), on the same serialized queue.
+      if (opts.postSettle) {
+        try {
+          await opts.postSettle({ txHash: hash, payee, paymentId: args.paymentId });
+        } catch {
+          // A split/hook failure must not undo a settled receipt; surface via the hook's own logs.
+        }
+      }
       return { txHash: hash, payee };
     };
     // Serialize: each settle waits for the previous tx to be mined (nonce safety).

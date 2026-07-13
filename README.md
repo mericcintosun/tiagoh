@@ -26,9 +26,9 @@ not marketing. Everything settles on GOAT Network with Bitcoin finality.
 
 ## What is live right now
 
-- **10 Solidity contracts on GOAT Testnet3**, each exercised with real transactions, plus an
-  ERC-4337 session-key enforcer and a BitVM2 optimistic arbiter in source. 23 of 23 tests passing.
-  See [DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
+- **13 Solidity contracts on GOAT Testnet3**, each exercised with real transactions, including an
+  ERC-4337 session-key enforcer, a BitVM2 optimistic arbiter, and an ERC-8004 reputation registry
+  written from settlement outcomes. 28 of 28 tests passing. See [DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
 - **End to end x402 flow**: gateway answers 402, the client pays under budget, the tool runs, and only
   a successful call is billed. Run it with `pnpm --filter @tiagoh/e2e demo`.
 - **Autonomous buyer** that reads reputation, pays per call, verifies each output, and disputes bad
@@ -66,7 +66,7 @@ TIAGOH_ONCHAIN=1 PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e demo
 pnpm --filter @tiagoh/e2e agent
 
 # Contracts
-pnpm contracts:setup && pnpm contracts:test    # 23/23
+pnpm contracts:setup && pnpm contracts:test    # 28/28
 ```
 
 Full reviewer path: [docs/testing-playbook.md](docs/testing-playbook.md).
@@ -81,6 +81,7 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
                          GOAT Testnet3 contracts
    ReceiptRegistry · CascadeController · QualityBond · EscrowVault · DisputeArbiter
    ReputationScorer · ToolAuction · AgentRegistry · RevenueSplit · PaymentChannel
+   SessionKeyDelegator (ERC-4337) · BitVM2Arbiter · ERC8004ReputationRegistry
 ```
 
 | Path | What |
@@ -90,7 +91,7 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 | `packages/agent` | autonomous buyer: reads reputation, verifies output, disputes |
 | `packages/goat` | GOAT foundation: x402 and ERC-8004 (AgentKit), viem clients, on chain settle |
 | `packages/cli` | `tiagoh` CLI: init, wrap, connect, call |
-| `contracts` | Solidity (Foundry): the 10 contracts, tests, deploy script |
+| `contracts` | Solidity (Foundry): the 13 contracts, tests, deploy scripts |
 | `apps/dashboard` | Next.js dashboard, reads chain client side |
 | `tools/e2e` | runnable end to end demo |
 

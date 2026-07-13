@@ -127,8 +127,8 @@ const NOW = 1_752_000_000_000; // fixed reference (deterministic SSR/CSR, no hyd
 
 // ── Hero stat tiles ─────────────────────────────────────────────────────────
 export const heroStats: StatTile[] = [
-  { label: "contracts live", value: "10", sub: "GOAT Testnet3", accent: "primary" },
-  { label: "contract tests", value: "16/16", sub: "all passing", accent: "success" },
+  { label: "contracts live", value: "13", sub: "GOAT Testnet3", accent: "primary" },
+  { label: "contract tests", value: "28/28", sub: "all passing", accent: "success" },
   { label: "x402 flow", value: "end-to-end", sub: "pay per call", accent: "flow" },
   { label: "on-chain proof", value: "live txns", sub: "receipts + slash", accent: "warning" },
 ];
@@ -142,12 +142,13 @@ export const dashboardStats: StatTile[] = [
 ];
 
 // ── Revenue series (30 pts) ─────────────────────────────────────────────────
+// Fallback only: `useRevenue` derives real per-day revenue from on-chain receipts and shows a
+// "stub" badge if it ever falls back here. This baseline carries no fabricated figures — it is a
+// flat zero scaffold so an RPC outage never renders invented revenue.
 export const revenueSeries: RevenuePoint[] = Array.from({ length: 30 }, (_, i) => {
-  const base = 900 + Math.sin(i / 3.1) * 320 + i * 46;
-  const revenueUsd = Math.max(180, Math.round(base + (i % 5 === 0 ? 260 : 0)));
   const d = new Date(NOW - (29 - i) * 86_400_000);
   const date = d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-  return { date, revenueUsd, calls: Math.round(revenueUsd / 2.4) };
+  return { date, revenueUsd: 0, calls: 0 };
 });
 
 // ── Receipts ────────────────────────────────────────────────────────────────
@@ -564,4 +565,7 @@ export const contractGrid: ContractInfo[] = [
   { name: "ReputationScorer", purpose: "Aggregate score over receipts + slashes", address: deployedContracts.reputationScorer, status: "live" },
   { name: "ToolAuction", purpose: "Open request, collect bids, clear + settle", address: deployedContracts.toolAuction, status: "live" },
   { name: "AgentRegistry", purpose: "ERC-8004 identity + capped delegation", address: deployedContracts.agentRegistry, status: "live" },
+  { name: "SessionKeyDelegator", purpose: "ERC-4337 session keys: capped, signed, revocable spend", address: deployedContracts.sessionKeyDelegator, status: "live" },
+  { name: "BitVM2Arbiter", purpose: "Optimistic dispute ruling, BitVM2 fraud-proof challenge", address: deployedContracts.bitVM2Arbiter, status: "live" },
+  { name: "ERC8004ReputationRegistry", purpose: "ERC-8004 feedback written from settlement outcomes", address: deployedContracts.erc8004ReputationRegistry, status: "live" },
 ];

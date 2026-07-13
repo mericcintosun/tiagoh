@@ -6,7 +6,7 @@
 - **Explorer:** https://explorer.testnet3.goat.network
 - **Deployer:** [`0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516`](https://explorer.testnet3.goat.network/address/0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516)
 
-All 10 contracts of the tiagoh trust-layer suite are live and verified on-chain (real bytecode).
+All 13 contracts of the tiagoh trust-layer suite are live and verified on-chain (real bytecode).
 
 | Contract | Address | Deploy tx |
 | --- | --- | --- |
@@ -20,9 +20,13 @@ All 10 contracts of the tiagoh trust-layer suite are live and verified on-chain 
 | ReputationScorer | [`0x10d7…C695`](https://explorer.testnet3.goat.network/address/0x10d7eC7fEbCB3009e2842B35616eA1609249C695) | [`0x0d2651…`](https://explorer.testnet3.goat.network/tx/0x0d26518a484c36f49c466ea48e9e9e3ff54da8de5ec8750a59d396bd8f66c1d4) |
 | ToolAuction | [`0x4D2E…C9d7`](https://explorer.testnet3.goat.network/address/0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7) | [`0xea3bee…`](https://explorer.testnet3.goat.network/tx/0xea3bee26687a5df8556c0dfccd881b4e5e2271348480e4a4376bb23be5bd8cd6) |
 | AgentRegistry | [`0x13E1…1215`](https://explorer.testnet3.goat.network/address/0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215) | [`0x47f4a5…`](https://explorer.testnet3.goat.network/tx/0x47f4a57dfe2a101f119da2b301af9068039e1b98df7c4d4c362c38bd23abfb7b) |
+| SessionKeyDelegator | [`0x24Df…5555`](https://explorer.testnet3.goat.network/address/0x24Df4B7f3ECd1c5692D1e8FC91d46e119c355555) | [`0x2fd47d…`](https://explorer.testnet3.goat.network/tx/0x2fd47d11652a10b2b22db883800129f65f8e8d338618e74ad258f71f88b3f57a) |
+| BitVM2Arbiter | [`0x35aD…36D2`](https://explorer.testnet3.goat.network/address/0x35aD6433d2e532c0938D79353F6882f68F2d36D2) | [`0x8b7898…`](https://explorer.testnet3.goat.network/tx/0x8b7898aac5da5708ec7914e8f8aa936bf8e5d234abd4137ba52cec76aac0f44d) |
+| ERC8004ReputationRegistry | [`0x59AB…88A2`](https://explorer.testnet3.goat.network/address/0x59ABEE0BA201E99AEAa2E80141D291e2ac4a88A2) | [`0x35f2aa…`](https://explorer.testnet3.goat.network/tx/0x35f2aa4037ffb331c023ad401788dee4d8046b83c55dbdf20faee0c13dfcec52) |
 
 Structured record: [`contracts/deployments/goat-testnet3.json`](../contracts/deployments/goat-testnet3.json).
-Deployed with `forge script script/Deploy.s.sol --broadcast` (gas paid in BTC; ~0.0000015 BTC total).
+The core suite deployed with `forge script script/Deploy.s.sol --broadcast`; the three trust-layer
+additions with `forge script script/DeployScaffolds.s.sol --broadcast` (gas paid in BTC).
 
 ## Live-exercised on GOAT Testnet3 (real transactions)
 
@@ -42,6 +46,9 @@ redeployed bound to that token to exercise real transfers.
 | Auction (§5.5) | 3 signed bids (80/50/65) → `clear` picks lowest-price winner @50 → `settle` |
 | Revenue splits | fund 1000, 60/40 → `release` P1=600 / P2=400 |
 | Prepaid channels | `open(1000)` → redeem vouchers 300 then 500 (recipient +500) → stale voucher **`NonMonotonic`** → close refunds 500 |
+| Session keys (ERC-4337) | `grant(sk, cap 1000)` → off-key signed `spend(400)` recovers the session key on-chain → `remaining`=600 |
+| BitVM2 arbiter | recourse wired to QualityBond + EscrowVault → `openDispute` → `propose(forBuyer)` → `rule` → **`RULED`** (`DisputeRuled` + `RecourseExecuted`) |
+| ERC-8004 reputation | `registerAgent(tool)` → agentId 1 → `giveFeedback(+100, 'tiagoh'/'success')` → `getSummary` count 1, sumWad `1e20` |
 
 ## End-to-end x402 pipeline → real on-chain receipts
 

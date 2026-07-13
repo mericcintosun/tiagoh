@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { useCascade } from "@/lib/chain-data";
+import type { CascadeNode } from "@/lib/mock";
 
 interface Hop {
   id: string;
@@ -29,16 +31,48 @@ interface Hop {
   attribution: number;
 }
 
-const INITIAL: Hop[] = [
-  { id: "h1", label: "market.prices()", handle: "defidata.goat", amount: 0.42, attribution: 12 },
-  { id: "h2", label: "rwa.spot()", handle: "rwa.goat", amount: 0.28, attribution: 8 },
-  { id: "h3", label: "yield.scan()", handle: "yields.goat", amount: 0.9, attribution: 15 },
-  { id: "h4", label: "premium.forecast()", handle: "forecast.goat", amount: 2.6, attribution: 20 },
-];
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Flatten a real cascade tree into the downstream hops the root paid for. */
+function toHops(root: CascadeNode): Hop[] {
+  const out: Hop[] = [];
+  const walk = (n: CascadeNode) => {
+    for (const c of n.children ?? []) {
+      out.push({
+        id: c.id,
+        label: c.label,
+        handle: c.handle,
+        amount: round2(c.amountUsd) || 0.01,
+        attribution: c.attributionPct,
+      });
+      walk(c);
+    }
+  };
+  walk(root);
+  return out;
+}
 
 export default function PlaygroundPage() {
-  const [budget, setBudget] = React.useState(5);
-  const [hops, setHops] = React.useState<Hop[]>(INITIAL);
+  const { data: tree, source } = useCascade();
+
+  const [hops, setHops] = React.useState<Hop[]>([]);
+  const [budget, setBudget] = React.useState(1);
+  const seededId = React.useRef<string | null>(null);
+
+  // Seed the editable what-if from the live cascade once (re-seed only if a new cascade appears).
+  React.useEffect(() => {
+    if (!tree || seededId.current === tree.id) return;
+    seededId.current = tree.id;
+    const seeded = toHops(tree);
+    setHops(seeded);
+    const total = seeded.reduce((s, h) => s + h.amount, 0);
+    setBudget(round2(Math.max(0.5, total * 1.2)));
+  }, [tree]);
+
+  // Budget-slider bounds scale to the real hop costs, so the on-chain rejection stays reachable.
+  const totalCost = React.useMemo(() => hops.reduce((s, h) => s + h.amount, 0), [hops]);
+  const budgetMax = Math.max(round2(totalCost * 1.5), 1);
+  const budgetStep = Math.max(0.01, round2(budgetMax / 100));
 
   // Sequential budget check, mirrors CascadeController: a hop that would exceed the
   // remaining root budget is refused on-chain (BudgetExceeded), preserving parents.
@@ -65,10 +99,15 @@ export default function PlaygroundPage() {
   }
 
   function settle() {
-    toast.success("Cascade settled", {
-      description: `${settledCount} hops settled · ${formatUsd(evaluated.spent)} spent · ${formatUsd(evaluated.refund)} refunded to root.`,
+    toast.success("Cascade evaluated", {
+      description: `${settledCount} hops settle · ${formatUsd(evaluated.spent)} spent · ${formatUsd(evaluated.refund)} refunded to root.`,
     });
   }
+
+  const liveNote =
+    source === "chain"
+      ? "Seeded from a real cascade anchored on GOAT Testnet3. Tune the budget to model the on-chain rejection over live hop costs."
+      : "No cascade on chain to read yet, so this shows an illustrative cascade. It goes live as soon as receipts are anchored.";
 
   return (
     <AppShell>
@@ -76,14 +115,16 @@ export default function PlaygroundPage() {
         eyebrow="Playground"
         title="Interactive cascade"
         description="Open a root budget, tune each hop, and watch the contract refuse any hop that would blow the cap, then refund the remainder on close."
-        source="stub"
+        source={source}
         action={
           <Button onClick={settle} size="sm">
             <Sparkle className="h-4 w-4" weight="fill" />
-            Settle cascade
+            Evaluate cascade
           </Button>
         }
       />
+
+      <p className="mb-6 text-sm text-muted-foreground">{liveNote}</p>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
         {/* ── Controls / hops ─────────────────────────────── */}
@@ -101,14 +142,14 @@ export default function PlaygroundPage() {
             <CardContent>
               <Slider
                 value={[budget]}
-                min={1}
-                max={10}
-                step={0.5}
+                min={0}
+                max={budgetMax}
+                step={budgetStep}
                 onValueChange={(v) => setBudget(v[0] ?? budget)}
               />
               <div className="mt-3 flex items-center gap-3">
                 <Progress
-                  value={(evaluated.spent / budget) * 100}
+                  value={budget > 0 ? (evaluated.spent / budget) * 100 : 0}
                   className="h-2"
                   indicatorClassName="bg-flow"
                 />
@@ -158,8 +199,8 @@ export default function PlaygroundPage() {
                     </div>
                     <Slider
                       value={[h.amount]}
-                      min={0.05}
-                      max={5}
+                      min={0.01}
+                      max={Math.max(1, round2(h.amount * 3))}
                       step={0.01}
                       onValueChange={(v) => updateHop(h.id, { amount: v[0] ?? h.amount })}
                     />
@@ -224,9 +265,9 @@ export default function PlaygroundPage() {
               )}
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Every settlement anchors a receipt with its cascade parentId; the graph
-              reconstructs from chain data alone. Push a hop over the cap to see the
-              on-chain rejection.
+              Every settlement anchors a receipt with its cascade parentId; the hops above
+              are reconstructed from those links. Drag the budget below the hop costs to see
+              the on-chain rejection.
             </p>
           </CardContent>
         </Card>

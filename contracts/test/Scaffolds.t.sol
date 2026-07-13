@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {SessionKeyDelegator} from "../src/SessionKeyDelegator.sol";
 import {BitVM2Arbiter} from "../src/BitVM2Arbiter.sol";
+import {ERC8004ReputationRegistry} from "../src/ERC8004ReputationRegistry.sol";
 
 contract SessionKeyDelegatorTest is Test {
     SessionKeyDelegator del;
@@ -80,6 +81,59 @@ contract MockEscrow {
 
     function refund(uint256 escrowId) external {
         refunded = escrowId;
+    }
+}
+
+contract ERC8004ReputationRegistryTest is Test {
+    ERC8004ReputationRegistry reg;
+    address tool = address(0x700);
+    address payer = address(0xdA11);
+
+    function setUp() public {
+        reg = new ERC8004ReputationRegistry();
+    }
+
+    function test_register_mintsSequentialIds() public {
+        uint256 id = reg.registerAgent(tool);
+        assertEq(id, 1);
+        assertEq(reg.agentOf(tool), 1);
+        assertEq(reg.subjectOf(1), tool);
+    }
+
+    function test_giveFeedback_aggregatesSummary() public {
+        uint256 id = reg.registerAgent(tool);
+        vm.prank(payer);
+        reg.giveFeedback(id, 100, 0, "tiagoh", "success", "https://tool/mcp", "receipt:1", bytes32(uint256(1)));
+        vm.prank(payer);
+        reg.giveFeedback(id, -100, 0, "tiagoh", "dispute", "https://tool/mcp", "receipt:2", bytes32(uint256(2)));
+        (uint64 count, int256 sumWad, int256 avgWad) = reg.getSummary(id);
+        assertEq(count, 2);
+        assertEq(sumWad, 0); // +100 and -100 cancel, normalized to WAD
+        assertEq(avgWad, 0);
+        assertEq(reg.clientCount(id), 1);
+    }
+
+    function test_selfFeedback_reverts() public {
+        uint256 id = reg.registerAgent(tool);
+        vm.prank(tool);
+        vm.expectRevert(ERC8004ReputationRegistry.SelfFeedback.selector);
+        reg.giveFeedback(id, 100, 0, "tiagoh", "success", "", "", bytes32(0));
+    }
+
+    function test_feedback_unknownAgent_reverts() public {
+        vm.prank(payer);
+        vm.expectRevert(ERC8004ReputationRegistry.AgentUnknown.selector);
+        reg.giveFeedback(999, 100, 0, "tiagoh", "success", "", "", bytes32(0));
+    }
+
+    function test_revoke_dropsFromSummary() public {
+        uint256 id = reg.registerAgent(tool);
+        vm.prank(payer);
+        uint64 idx = reg.giveFeedback(id, 100, 0, "tiagoh", "success", "", "", bytes32(0));
+        vm.prank(payer);
+        reg.revokeFeedback(id, idx);
+        (uint64 count,,) = reg.getSummary(id);
+        assertEq(count, 0);
     }
 }
 

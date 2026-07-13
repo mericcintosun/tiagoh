@@ -23,6 +23,9 @@ export const deployedContracts = {
   reputationScorer: "0x10d7eC7fEbCB3009e2842B35616eA1609249C695",
   toolAuction: "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
   agentRegistry: "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215",
+  sessionKeyDelegator: "0x24Df4B7f3ECd1c5692D1e8FC91d46e119c355555",
+  bitVM2Arbiter: "0x35aD6433d2e532c0938D79353F6882f68F2d36D2",
+  erc8004ReputationRegistry: "0x59ABEE0BA201E99AEAa2E80141D291e2ac4a88A2",
 } as const satisfies Record<string, `0x${string}`>;
 
 /** Explorer link helpers. */
