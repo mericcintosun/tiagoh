@@ -1,8 +1,9 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * tiagoh brand — a teal interlocking-knot mark (the "linked / cascade" motif)
- * + a serif `tiagoh` wordmark.
+ * tiagoh brand — the teal interlocking-knot mark (public/mark.png) + a serif
+ * `tiagoh` wordmark.
  */
 export function Logo({
   className,
@@ -13,7 +14,7 @@ export function Logo({
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <LedgerMark className="h-6 w-6" />
+      <LedgerMark className="h-7 w-7" />
       {showWordmark && (
         <span
           className="text-[17px] font-semibold tracking-tight text-foreground"
@@ -26,12 +27,16 @@ export function Logo({
   );
 }
 
-/** The tiagoh mark: two interlocking rounded loops (teal), scales to any size. */
+/** The tiagoh knot mark. */
 export function LedgerMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
-      <rect x="7.5" y="16" width="22" height="19" rx="9.5" stroke="#2E9E8E" strokeWidth="4.6" />
-      <rect x="18.5" y="13" width="22" height="19" rx="9.5" stroke="#2E9E8E" strokeWidth="4.6" />
-    </svg>
+    <Image
+      src="/mark.png"
+      alt="tiagoh"
+      width={40}
+      height={42}
+      priority
+      className={cn("object-contain", className)}
+    />
   );
 }

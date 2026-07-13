@@ -31,12 +31,13 @@ export const metadata: Metadata = {
     "ERC-8004",
     "Bitcoin settlement",
   ],
-  metadataBase: new URL("https://tiagoh.xyz"),
+  metadataBase: new URL("https://tiagoh.vercel.app"),
   openGraph: {
     title: "tiagoh — insured settlement for the agent economy",
     description:
       "Payments that cascade. Trust that settles. Insured, reputation-ranked MCP tools on GOAT.",
     type: "website",
+    images: ["/logo.png"],
   },
 };
 
