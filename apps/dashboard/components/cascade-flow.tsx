@@ -78,7 +78,7 @@ function CascadeRow({ node, depth }: { node: CascadeNode; depth: number }) {
             </span>
           ) : over ? (
             <span className="text-destructive">
-              hop refused on-chain — parent budget preserved
+              hop refused on-chain, parent budget preserved
             </span>
           ) : (
             <span>root deposit</span>

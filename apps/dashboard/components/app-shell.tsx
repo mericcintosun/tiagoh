@@ -54,7 +54,7 @@ export function SourceBadge({ source }: { source: "chain" | "stub" }) {
       title={
         source === "chain"
           ? "Decoded from on-chain events via viem/wagmi"
-          : "Typed stub rows until contract addresses resolve — data path is already client-side"
+          : "Live on-chain reads, with typed fallback rows when a read is empty. No backend."
       }
     >
       {source === "chain" ? "on-chain" : "typed stub"}
