@@ -4,9 +4,9 @@
 
 **Get paid per call for your MCP tools. AI agents pay in x402, settled on Bitcoin through GOAT Network.**
 
-[Live demo](https://tiagoh.vercel.app) · [MCP endpoint](https://tiagoh.vercel.app/api/mcp) · [Deployments](docs/DEPLOYMENTS.md) · [x402 spec](docs/x402-mcp-spec.md)
+[▶ Watch the 3 min demo](https://youtu.be/TA4zJ36k0PU) · [Live demo](https://tiagoh.vercel.app) · [MCP endpoint](https://tiagoh.vercel.app/api/mcp) · [Deployments](docs/DEPLOYMENTS.md) · [x402 spec](docs/x402-mcp-spec.md)
 
-GOAT Network AI Builder Grants 2026
+Live on GOAT Network mainnet · GOAT Network AI Builder 2026
 
 </div>
 
@@ -26,9 +26,12 @@ not marketing. Everything settles on GOAT Network with Bitcoin finality.
 
 ## What is live right now
 
-- **13 Solidity contracts on GOAT Testnet3**, each exercised with real transactions, including an
-  ERC-4337 session-key enforcer, a BitVM2 optimistic arbiter, and an ERC-8004 reputation registry
-  written from settlement outcomes. 28 of 28 tests passing. See [DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
+- **15 Solidity contracts on GOAT Network mainnet** (chainId 2345), with real receipts anchored on
+  chain, including an ERC-4337 session-key enforcer, a BitVM2 optimistic arbiter, and an ERC-8004
+  reputation registry written from settlement outcomes. 63 of 63 tests passing (unit, fuzz, and
+  invariant). Launched with guarded value caps ahead of a full audit. Addresses in
+  [contracts/deployments/goat-mainnet.json](contracts/deployments/goat-mainnet.json); see
+  [SECURITY.md](docs/SECURITY.md) for the threat model.
 - **End to end x402 flow**: gateway answers 402, the client pays under budget, the tool runs, and only
   a successful call is billed. Run it with `pnpm --filter @tiagoh/e2e demo`.
 - **Autonomous buyer** that reads reputation, pays per call, verifies each output, and disputes bad
@@ -59,14 +62,14 @@ pnpm install && pnpm -r --filter "./packages/**" build
 # End to end x402 flow: per call payment, charge on success, a 3 hop cascade, budget rejection
 pnpm --filter @tiagoh/e2e demo
 
-# Same flow, anchoring real receipts to ReceiptRegistry on GOAT Testnet3
+# Same flow, anchoring real receipts to ReceiptRegistry on GOAT (testnet or mainnet)
 TIAGOH_ONCHAIN=1 PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e demo
 
 # Autonomous buyer: discover, read reputation, pay, verify, dispute bad output
 pnpm --filter @tiagoh/e2e agent
 
-# Contracts
-pnpm contracts:setup && pnpm contracts:test    # 28/28
+# Contracts (unit + fuzz + invariant)
+pnpm contracts:setup && pnpm contracts:test    # 63/63
 ```
 
 Full reviewer path: [docs/testing-playbook.md](docs/testing-playbook.md).
@@ -78,7 +81,7 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
     (pays x402)               (charge on success)                 (unchanged)
                                      │
                                      ▼
-                         GOAT Testnet3 contracts
+                         GOAT Network mainnet contracts
    ReceiptRegistry · CascadeController · QualityBond · EscrowVault · DisputeArbiter
    ReputationScorer · ToolAuction · AgentRegistry · RevenueSplit · PaymentChannel
    SessionKeyDelegator (ERC-4337) · BitVM2Arbiter · ERC8004ReputationRegistry
@@ -91,7 +94,7 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 | `packages/agent` | autonomous buyer: reads reputation, verifies output, disputes |
 | `packages/goat` | GOAT foundation: x402 and ERC-8004 (AgentKit), viem clients, on chain settle |
 | `packages/cli` | `tiagoh` CLI: init, wrap, connect, call |
-| `contracts` | Solidity (Foundry): the 13 contracts, tests, deploy scripts |
+| `contracts` | Solidity (Foundry): the 15 contracts, tests, deploy scripts |
 | `apps/dashboard` | Next.js dashboard, reads chain client side |
 | `tools/e2e` | runnable end to end demo |
 
@@ -104,12 +107,14 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 
 ## Honest scope
 
-Payment signing in the demos is a local mock. Real settlement through GOAT's hosted x402 facilitator
-needs the x402 Integration Faucet token, and lands as a one line swap
-(`createFacilitatorSettle` in `@tiagoh/goat`). Everything else, including the on chain receipts, is
-real on testnet.
+The contracts are live on GOAT mainnet and hardened (adversarial review plus fuzz and invariant
+tests), but launched with guarded value caps and are not yet independently audited. See
+[SECURITY.md](docs/SECURITY.md) for the threat model and the mainnet gates. Payment signing in the
+demos is a local mock; real settlement through GOAT's hosted x402 facilitator lands as a one line
+swap (`createFacilitatorVerify` / `createFacilitatorSettle` in `@tiagoh/goat`) once the facilitator
+endpoint is wired.
 
 ## Tech
 
 TypeScript, Node 20, pnpm workspaces. Next.js 15 and shadcn/ui. `@modelcontextprotocol/sdk`. x402
-with ERC-3009. Solidity with Foundry. ERC-8004. GOAT Network testnet. Claude Opus 4.8 for the buyer.
+with ERC-3009. Solidity with Foundry. ERC-8004. GOAT Network mainnet. Claude Opus 4.8 for the buyer.

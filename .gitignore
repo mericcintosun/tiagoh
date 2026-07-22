@@ -30,3 +30,7 @@ coverage/
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# demo media (large binaries, not versioned)
+pitch-demo.mp4
+pitch-voice.opus
