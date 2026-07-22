@@ -50,7 +50,7 @@ contract Deploy is Script {
         console2.log("  ReceiptRegistry    ", address(new ReceiptRegistry(owner)));
         console2.log("  RevenueSplit       ", address(_deployRevenueSplit(paymentToken, owner)));
         console2.log("  CascadeController  ", address(new CascadeController(owner)));
-        console2.log("  PaymentChannel     ", address(new PaymentChannel()));
+        console2.log("  PaymentChannel     ", address(new PaymentChannel(vm.envOr("CHANNEL_DEPOSIT_CAP", uint256(0)))));
         console2.log("  QualityBond        ", address(new QualityBond(paymentToken, owner)));
         console2.log("  EscrowVault        ", address(new EscrowVault(owner)));
         console2.log("  DisputeArbiter     ", address(new DisputeArbiter(owner)));

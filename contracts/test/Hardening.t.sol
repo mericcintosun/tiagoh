@@ -100,6 +100,25 @@ contract EscrowHardeningTest is Test {
         vm.expectRevert(EscrowVault.NotArbiter.selector);
         escrow.unwindCascade(CASCADE);
     }
+
+    /// @dev Guarded launch: a deposit above the per-escrow cap is rejected.
+    function test_maxEscrow_capsDeposit() public {
+        vm.prank(owner);
+        escrow.setMaxEscrow(50e6);
+
+        token.mint(buyer, 100e6);
+        vm.prank(buyer);
+        token.approve(address(escrow), type(uint256).max);
+
+        vm.prank(buyer);
+        vm.expectRevert(EscrowVault.ExceedsCap.selector);
+        escrow.deposit(seller, address(token), 100e6, 1 days, bytes32(0));
+
+        // At or under the cap is fine.
+        vm.prank(buyer);
+        escrow.deposit(seller, address(token), 50e6, 1 days, bytes32(0));
+        assertEq(escrow.escrowCount(), 1);
+    }
 }
 
 contract Erc8004GatingTest is Test {

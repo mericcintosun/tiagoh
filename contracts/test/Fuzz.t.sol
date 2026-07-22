@@ -25,7 +25,7 @@ contract FuzzTest is Test {
     function setUp() public {
         cascade = new CascadeController(owner);
         del = new SessionKeyDelegator();
-        channel = new PaymentChannel();
+        channel = new PaymentChannel(0);
         token = new MockERC20("USD", "USD", 6);
         bondC = new QualityBond(address(token), owner);
         vm.prank(owner);

@@ -36,10 +36,14 @@ contract PaymentChannel is ReentrancyGuard, EIP712 {
 
     uint256 public channelCount;
     mapping(uint256 => Channel) public channels;
+    /// @notice Guarded-launch cap: max deposit a single channel may hold (0 = unlimited).
+    ///         Immutable — set at deploy so this ownerless contract needs no admin.
+    uint256 public immutable depositCap;
 
     error ZeroDeposit();
     error ZeroRecipient();
     error ChannelIsClosed();
+    error ExceedsCap();
     error NotSender();
     error NotRecipient();
     error BadSignature();
@@ -59,7 +63,10 @@ contract PaymentChannel is ReentrancyGuard, EIP712 {
     event Reclaimed(uint256 indexed channelId, uint256 amount);
     event ChannelClosed(uint256 indexed channelId, uint256 remainderToSender);
 
-    constructor() EIP712("tiagoh PaymentChannel", "1") {}
+    /// @param depositCap_ per-channel deposit cap (0 = unlimited). Guarded-launch control.
+    constructor(uint256 depositCap_) EIP712("tiagoh PaymentChannel", "1") {
+        depositCap = depositCap_;
+    }
 
     /// @notice Open a channel, pulling `deposit` from the caller (the sender).
     function open(address recipient, address token, uint256 deposit, uint256 duration)
@@ -69,6 +76,7 @@ contract PaymentChannel is ReentrancyGuard, EIP712 {
     {
         if (deposit == 0) revert ZeroDeposit();
         if (recipient == address(0)) revert ZeroRecipient();
+        if (depositCap != 0 && deposit > depositCap) revert ExceedsCap();
         uint256 exp = block.timestamp + duration;
         channelId = ++channelCount;
         channels[channelId] = Channel({

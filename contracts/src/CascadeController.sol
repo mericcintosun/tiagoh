@@ -42,8 +42,11 @@ contract CascadeController is Ownable2Step, ReentrancyGuard {
     mapping(uint256 => Cascade) public cascades;
     /// @dev cascadeId => hopId => Hop  (hopId 0 is reserved as "root / no parent")
     mapping(uint256 => mapping(uint256 => Hop)) public hops;
+    /// @notice Guarded-launch cap: max budget a single cascade may lock (0 = unlimited).
+    uint256 public maxBudget;
 
     error ZeroBudget();
+    error ExceedsCap();
     error NotOpener();
     error CascadeIsClosed();
     error BudgetExceeded(uint256 cascadeId, uint256 remaining, uint256 requested);
@@ -63,8 +66,15 @@ contract CascadeController is Ownable2Step, ReentrancyGuard {
         uint256 attributionToParent
     );
     event CascadeClosed(uint256 indexed cascadeId, uint256 refunded);
+    event MaxBudgetSet(uint256 maxBudget);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
+
+    /// @notice Set the per-cascade budget cap (0 = unlimited). Guarded-launch control.
+    function setMaxBudget(uint256 cap) external onlyOwner {
+        maxBudget = cap;
+        emit MaxBudgetSet(cap);
+    }
 
     /// @notice Open a cascade; pulls `budget` of `token` from the caller as the tree cap.
     function openCascade(address token, uint256 budget)
@@ -73,6 +83,7 @@ contract CascadeController is Ownable2Step, ReentrancyGuard {
         returns (uint256 cascadeId)
     {
         if (budget == 0) revert ZeroBudget();
+        if (maxBudget != 0 && budget > maxBudget) revert ExceedsCap();
         // Book the amount actually received (fee-on-transfer / rebasing safe), so a hop can
         // never be paid out against budget the contract does not hold.
         IERC20 t = IERC20(token);
@@ -80,6 +91,7 @@ contract CascadeController is Ownable2Step, ReentrancyGuard {
         t.safeTransferFrom(msg.sender, address(this), budget);
         uint256 received = t.balanceOf(address(this)) - balBefore;
         if (received == 0) revert ZeroBudget();
+        if (maxBudget != 0 && received > maxBudget) revert ExceedsCap();
 
         cascadeId = ++cascadeCount;
         cascades[cascadeId] = Cascade({

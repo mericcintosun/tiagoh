@@ -46,6 +46,9 @@ contract EscrowVault is Ownable2Step, ReentrancyGuard {
     mapping(bytes32 => uint256[]) public cascadeEscrows;
     /// @dev authorized arbiters (DisputeArbiter) that can release/refund/unwind
     mapping(address => bool) public isArbiter;
+    /// @notice Guarded-launch cap: max tokens a single escrow may hold (0 = unlimited). Lets a
+    ///         pre-audit mainnet bound the value at risk per escrow, raised as confidence grows.
+    uint256 public maxEscrow;
 
     error NotArbiter();
     error NotAuthorizedToRelease();
@@ -54,8 +57,10 @@ contract EscrowVault is Ownable2Step, ReentrancyGuard {
     error ZeroAmount();
     error ZeroPayee();
     error OnlySelf();
+    error ExceedsCap();
 
     event ArbiterSet(address indexed arbiter, bool allowed);
+    event MaxEscrowSet(uint256 maxEscrow);
     event Deposited(
         uint256 indexed escrowId,
         bytes32 indexed cascadeId,
@@ -83,6 +88,12 @@ contract EscrowVault is Ownable2Step, ReentrancyGuard {
         emit ArbiterSet(arbiter, allowed);
     }
 
+    /// @notice Set the per-escrow deposit cap (0 = unlimited). Guarded-launch control.
+    function setMaxEscrow(uint256 cap) external onlyOwner {
+        maxEscrow = cap;
+        emit MaxEscrowSet(cap);
+    }
+
     /// @notice Deposit a conditional payment; pulls the token from the caller (payer) and books
     ///         the amount actually received (fee-on-transfer / rebasing safe).
     /// @param cascadeId  Tag linking this escrow to a cascade tree (0 for standalone).
@@ -96,11 +107,14 @@ contract EscrowVault is Ownable2Step, ReentrancyGuard {
         if (amount == 0) revert ZeroAmount();
         if (payee == address(0)) revert ZeroPayee();
 
+        if (maxEscrow != 0 && amount > maxEscrow) revert ExceedsCap();
+
         IERC20 t = IERC20(token);
         uint256 balBefore = t.balanceOf(address(this));
         t.safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = t.balanceOf(address(this)) - balBefore;
         if (received == 0) revert ZeroAmount();
+        if (maxEscrow != 0 && received > maxEscrow) revert ExceedsCap();
 
         uint256 deadline = block.timestamp + duration;
         escrowId = ++escrowCount;

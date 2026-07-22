@@ -71,6 +71,23 @@ state-machine) plus fuzz/invariant tests. Fixed:
 | L1 | Low | A bond slashed to zero could be hijacked by a new seller | `bond()` keyed on `seller`, not `amount`. |
 | L2 | Low | `DisputeArbiter` lacked `ReentrancyGuard` | Added `nonReentrant` on `rule`. |
 
+## 4b. Static analysis + guarded launch
+
+- **Slither** runs in CI (`.github/workflows/ci.yml`, `slither` job, fail-on high).
+- **Aderyn** (Cyfrin, v0.6.8) run over the suite: **0 real high/medium findings.** Its "High —
+  uninitialized state variable" flags are `disputeCount`/`cascadeCount`/`channelCount` counters
+  and mappings (start at zero by design — a known Aderyn false positive). The Low findings are
+  style/gas nits (event indexing, `public`→`external`, magic literals) plus the centralization
+  risk already mitigated by `Ownable2Step` + the timelock runbook. `solc` is pinned to `0.8.24`
+  in `foundry.toml`, so the `^0.8.24` pragma does not affect deployed bytecode.
+- **Guarded launch (no-audit-budget mitigation):** the value-at-risk per position is capped so a
+  pre-audit mainnet bounds any loss to a small amount:
+  - `EscrowVault.maxEscrow` (owner-settable, 0 = unlimited)
+  - `CascadeController.maxBudget` (owner-settable, 0 = unlimited)
+  - `PaymentChannel.depositCap` (immutable, set at deploy)
+  Set them with `SetLaunchCaps.s.sol` (defaults: $50/escrow, $100/cascade). Raise as audit
+  coverage and TVL grow. This is a risk *reducer*, not a substitute for an audit.
+
 ## 5. Residual / accepted risks (must be understood before mainnet)
 
 - **`BitVM2Arbiter` is optimistic and only as safe as its verifier.** Its `propose`/`rule` model

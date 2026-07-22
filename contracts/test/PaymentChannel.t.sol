@@ -16,7 +16,7 @@ contract PaymentChannelTest is Test {
     uint256 internal constant DEPOSIT = 1_000e6;
 
     function setUp() public {
-        channel = new PaymentChannel();
+        channel = new PaymentChannel(0); // 0 = uncapped in tests
         token = new MockERC20("USD", "USD", 6);
         sender = vm.addr(senderPk);
         token.mint(sender, DEPOSIT);
