@@ -45,13 +45,13 @@ export function shortHash(hash: string, lead = 6, tail = 4): string {
 /** Explorer tx link from the public GOAT explorer base. */
 export function explorerTx(hash: string): string {
   const base =
-    process.env.NEXT_PUBLIC_GOAT_EXPLORER_URL ?? "https://explorer.testnet3.goat.network";
+    process.env.NEXT_PUBLIC_GOAT_EXPLORER_URL ?? "https://explorer.goat.network";
   return `${base.replace(/\/$/, "")}/tx/${hash}`;
 }
 
 export function explorerAddress(address: string): string {
   const base =
-    process.env.NEXT_PUBLIC_GOAT_EXPLORER_URL ?? "https://explorer.testnet3.goat.network";
+    process.env.NEXT_PUBLIC_GOAT_EXPLORER_URL ?? "https://explorer.goat.network";
   return `${base.replace(/\/$/, "")}/address/${address}`;
 }
 

@@ -7,7 +7,7 @@
  * RPC configured in `lib/wagmi.ts`. `useChainStatus` is a LIVE read (block number +
  * chain id + connection state) proving the path is real. The domain hooks
  * (`useReceipts`, `useLeaderboard`, …) decode the deployed contracts on GOAT
- * Testnet3 (chainId 48816): `publicClient.getLogs()` for events + `readContract()`
+ * mainnet (chainId 2345): `publicClient.getLogs()` for events + `readContract()`
  * for view calls, wrapped in react-query with a ~15s refetch. Each hook returns real
  * on-chain rows with `source: "chain"` and falls back to the typed stub (or an empty
  * array) on any read error / empty result so the UI never throws in render.
@@ -41,18 +41,18 @@ import {
 
 // ── On-chain constants ───────────────────────────────────────────────────────
 
-/** Contracts deployed ~block 15,080,000; query from just below to dodge RPC range caps. */
-const FROM_BLOCK = 15_070_000n;
+/** Contracts deployed ~block 14,017,600 on GOAT mainnet; query from just below to dodge RPC range caps. */
+const FROM_BLOCK = 14_017_000n;
 const ZERO_BYTES32 = `0x${"0".repeat(64)}` as const;
 const ZERO_HASH = ZERO_BYTES32 as `0x${string}`;
 const POLL = 15_000;
 
 /**
- * Token-bound exercised instance of QualityBond (a real BRONZE bond staked → arbiter
- * slash 300 → remaining 700). The main QualityBond deployment holds no live bonds, so
- * the bond feed reads this exercised instance's events.
+ * QualityBond deployment the bond feed reads. On mainnet this is the live QualityBond
+ * (bonds appear here once sellers stake); with no live bonds the feed falls back to
+ * typed stub rows.
  */
-const QUALITY_BOND_EXERCISED = "0xd31f7062e28912ed46f32088d641caebdb74883c" as Address;
+const QUALITY_BOND_EXERCISED = "0x0b592E60706695Dc1E84bFda4f2ec59dc660e980" as Address;
 
 /** Reverse map for the demo tool ids: toolId = keccak256(toHex(name)) (see @tiagoh/goat settle). */
 const TOOL_NAMES = [
@@ -707,7 +707,7 @@ function buildCascade(rows: DecodedReceipt[]): CascadeNode | null {
 }
 
 /**
- * LIVE read of the deployed ReceiptRegistry (GOAT Testnet3) — real client-side
+ * LIVE read of the deployed ReceiptRegistry (GOAT mainnet) — real client-side
  * chain access via wagmi `useReadContract`, no backend. Returns the on-chain
  * receipt count + total volume, polled from the RPC.
  */

@@ -2,19 +2,18 @@ import { createConfig, http } from "wagmi";
 import { defineChain } from "viem";
 
 /**
- * GOAT Testnet3 chain (defined locally so the dashboard is a self-contained
+ * GOAT Network mainnet chain (defined locally so the dashboard is a self-contained
  * Next.js app — deployable anywhere with no workspace build step). The RPC is
  * baked in as the chain default, so no env config is required.
  */
 export const goatChain = defineChain({
-  id: 48816,
-  name: "GOAT Testnet3",
+  id: 2345,
+  name: "GOAT Network",
   nativeCurrency: { name: "Bitcoin", symbol: "BTC", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.testnet3.goat.network"] } },
+  rpcUrls: { default: { http: ["https://rpc.goat.network"] } },
   blockExplorers: {
-    default: { name: "GOAT Explorer", url: "https://explorer.testnet3.goat.network" },
+    default: { name: "GOAT Explorer", url: "https://explorer.goat.network" },
   },
-  testnet: true,
 });
 
 /**

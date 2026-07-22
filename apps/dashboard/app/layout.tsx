@@ -14,7 +14,7 @@ const fraunces = Fraunces({
 });
 
 const SITE_DESCRIPTION =
-  "tiagoh turns any MCP server into a paid tool. Agents pay per call over x402, payments cascade across multi-hop tool chains, and quality bonds refund the buyer when output is bad. Ten Solidity contracts run live on GOAT Testnet3.";
+  "tiagoh turns any MCP server into a paid tool. Agents pay per call over x402, payments cascade across multi-hop tool chains, and quality bonds refund the buyer when output is bad. Fifteen Solidity contracts run live on GOAT mainnet.";
 
 export const metadata: Metadata = {
   title: {
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "tiagoh: paid MCP tools with x402 payments on GOAT",
     description:
-      "Sell your MCP tools and get paid per call over x402. Payments cascade across tool chains, and quality bonds refund bad output. Live on GOAT Testnet3.",
+      "Sell your MCP tools and get paid per call over x402. Payments cascade across tool chains, and quality bonds refund bad output. Live on GOAT mainnet.",
     url: "https://tiagoh.vercel.app",
     siteName: "tiagoh",
     type: "website",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "tiagoh: paid MCP tools with x402 payments on GOAT",
     description:
-      "Sell your MCP tools and get paid per call over x402. Payments cascade across tool chains, and quality bonds refund bad output. Live on GOAT Testnet3.",
+      "Sell your MCP tools and get paid per call over x402. Payments cascade across tool chains, and quality bonds refund bad output. Live on GOAT mainnet.",
     images: ["/logo.png"],
   },
   robots: {

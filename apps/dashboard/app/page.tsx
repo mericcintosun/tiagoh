@@ -159,7 +159,7 @@ const ROADMAP = [
   {
     phase: "shipped",
     tone: "success" as const,
-    items: ["10 contracts live on GOAT Testnet3", "x402 pay-per-call flow", "cascade payments + receipts", "bond slash + atomic refund"],
+    items: ["15 contracts live on GOAT mainnet", "x402 pay-per-call flow", "cascade payments + receipts", "bond slash + atomic refund"],
   },
   {
     phase: "next",
@@ -193,7 +193,7 @@ const FAQ = [
   },
   {
     q: "Is there a backend?",
-    a: "No. Every number on this dashboard is read client-side straight from GOAT Testnet3 via viem and wagmi over a public RPC. The contracts hold the data; the UI just decodes it.",
+    a: "No. Every number on this dashboard is read client-side straight from GOAT mainnet via viem and wagmi over a public RPC. The contracts hold the data; the UI just decodes it.",
   },
   {
     q: "How do atomic refunds work across a cascade?",
@@ -466,8 +466,8 @@ export default function LandingPage() {
         <Section id="contracts">
           <SectionHeading
             eyebrow="Contracts"
-            title="Ten Solidity contracts, live on GOAT Testnet3"
-            lead="All ten are deployed on GOAT Testnet3, and 16 of 16 contract tests pass. Every address below is real and resolves on the block explorer."
+            title="Fifteen Solidity contracts, live on GOAT mainnet"
+            lead="All fifteen are deployed on GOAT mainnet, and 63 of 63 tests pass. Every address below is real and resolves on the block explorer."
           />
           <div className="mt-10 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-2">
             {contractGrid.map((c, i) => (

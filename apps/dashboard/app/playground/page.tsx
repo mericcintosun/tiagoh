@@ -106,7 +106,7 @@ export default function PlaygroundPage() {
 
   const liveNote =
     source === "chain"
-      ? "Seeded from a real cascade anchored on GOAT Testnet3. Tune the budget to model the on-chain rejection over live hop costs."
+      ? "Seeded from a real cascade anchored on GOAT mainnet. Tune the budget to model the on-chain rejection over live hop costs."
       : "No cascade on chain to read yet, so this shows an illustrative cascade. It goes live as soon as receipts are anchored.";
 
   return (

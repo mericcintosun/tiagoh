@@ -22,7 +22,7 @@ const handler = createMcpHandler(
               goatTvlUsd: 41_200_000,
               source: "tiagoh:goat-defi-data",
               x402PriceUsd: 0.01,
-              network: "goat:48816",
+              network: "goat:2345",
             }),
           },
         ],

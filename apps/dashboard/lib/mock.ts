@@ -2,7 +2,7 @@
  * Typed fallback data for tiagoh surfaces.
  *
  * The live data comes from lib/chain-data.ts, which decodes the deployed GOAT
- * Testnet3 contracts client side (getLogs + readContract). These typed rows are the
+ * mainnet contracts client side (getLogs + readContract). These typed rows are the
  * fallback each hook returns if a chain read errors or is empty, so the UI never
  * breaks. Shapes mirror the PRD sections 5 and 7 contract models.
  */
@@ -127,7 +127,7 @@ const NOW = 1_752_000_000_000; // fixed reference (deterministic SSR/CSR, no hyd
 
 // ── Hero stat tiles ─────────────────────────────────────────────────────────
 export const heroStats: StatTile[] = [
-  { label: "contracts live", value: "13", sub: "GOAT Testnet3", accent: "primary" },
+  { label: "contracts live", value: "15", sub: "GOAT mainnet", accent: "primary" },
   { label: "contract tests", value: "28/28", sub: "all passing", accent: "success" },
   { label: "x402 flow", value: "end-to-end", sub: "pay per call", accent: "flow" },
   { label: "on-chain proof", value: "live txns", sub: "receipts + slash", accent: "warning" },
@@ -135,7 +135,7 @@ export const heroStats: StatTile[] = [
 
 // ── Dashboard stat tiles ────────────────────────────────────────────────────
 export const dashboardStats: StatTile[] = [
-  { label: "receipts", value: "on-chain", sub: "GOAT Testnet3", accent: "primary" },
+  { label: "receipts", value: "on-chain", sub: "GOAT mainnet", accent: "primary" },
   { label: "billing", value: "charge-on-success", sub: "failed calls are free", accent: "flow" },
   { label: "output", value: "quality-bonded", sub: "refund on bad output", accent: "success" },
   { label: "settlement", value: "Bitcoin finality", sub: "via GOAT", accent: "warning" },
