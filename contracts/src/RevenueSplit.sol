@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -10,7 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 ///         point here and earnings split between payees by fixed weights, pull-based
 ///         (PRD §5.0 C6). Modeled on OpenZeppelin's (now-removed) PaymentSplitter but
 ///         scoped to one ERC-20 token.
-contract RevenueSplit is Ownable {
+contract RevenueSplit is Ownable2Step {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable token;

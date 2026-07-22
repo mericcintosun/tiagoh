@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -12,7 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 ///         An authorized arbiter (the DisputeArbiter, or a verifier oracle) can `slash`
 ///         the bond and route the slashed amount to the harmed buyer as an auto-refund.
 ///         The seller may unbond after a cooldown.
-contract QualityBond is Ownable, ReentrancyGuard {
+contract QualityBond is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable token;
@@ -49,6 +49,7 @@ contract QualityBond is Ownable, ReentrancyGuard {
     error StillLocked();
     error CooldownNotElapsed();
     error SlashExceedsBond();
+    error ZeroAddress();
 
     event TierSet(Tier indexed tier, uint256 amount);
     event ArbiterSet(address indexed arbiter, bool allowed);
@@ -65,8 +66,12 @@ contract QualityBond is Ownable, ReentrancyGuard {
         tierAmount[Tier.GOLD] = 2000e6;
     }
 
+    /// @dev Least privilege: the owner is NOT implicitly a slasher. Only addresses explicitly
+    ///      granted via `setArbiter` (the DisputeArbiter contract) may slash, so a compromised
+    ///      owner key cannot drain bonds directly — it can only (re)assign the arbiter, which a
+    ///      timelock makes observable. This closes the "owner drains all bond TVL" path.
     modifier onlyArbiter() {
-        if (!isArbiter[msg.sender] && msg.sender != owner()) revert NotArbiter();
+        if (!isArbiter[msg.sender]) revert NotArbiter();
         _;
     }
 
@@ -86,10 +91,13 @@ contract QualityBond is Ownable, ReentrancyGuard {
     }
 
     /// @notice Seller stakes a bond of `tier` against `toolId`.
+    /// @dev    Keyed on `seller`, not `amount`: a bond slashed to zero is still occupied by its
+    ///         original seller until they `startUnbond` + `withdraw` (which deletes it). This
+    ///         stops a griefer from hijacking a tool's bond slot the instant it is slashed to 0.
     function bond(bytes32 toolId, Tier tier) external nonReentrant {
         if (tier == Tier.NONE) revert InvalidTier();
         Bond storage b = bonds[toolId];
-        if (b.amount != 0) revert AlreadyBonded();
+        if (b.seller != address(0)) revert AlreadyBonded();
 
         uint256 amt = tierAmount[tier];
         if (amt == 0) revert InvalidTier();
@@ -102,6 +110,7 @@ contract QualityBond is Ownable, ReentrancyGuard {
 
     /// @notice Arbiter slashes `amount` from a tool's bond to `to` (the refunded buyer).
     function slash(bytes32 toolId, uint256 amount, address to) external onlyArbiter nonReentrant {
+        if (to == address(0)) revert ZeroAddress();
         Bond storage b = bonds[toolId];
         if (b.amount == 0) revert NoBond();
         if (amount > b.amount) revert SlashExceedsBond();

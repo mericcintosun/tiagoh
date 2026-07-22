@@ -2,53 +2,76 @@
 pragma solidity ^0.8.24;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 /// @title SessionKeyDelegator
 /// @notice Scoped, signature-gated spend delegation: the on-chain enforcement point for capped
 ///         agent-to-agent sub-budgets (PRD 5.3), and the piece an ERC-4337 account's validation
 ///         hook calls before executing a UserOp. A parent grants a session key a spend cap and an
-///         expiry. Every spend must carry the session key's signature over (this, parent, amount,
-///         nonce), is nonce-protected against replay, and reverts past the cap. Keys revoke instantly.
-contract SessionKeyDelegator {
+///         expiry. Every spend must carry the session key's EIP-712 signature over (parent,
+///         amount, nonce), is nonce-protected against replay, and reverts past the cap. Keys
+///         revoke instantly.
+/// @dev    Spends are EIP-712 typed signatures: the domain binds chainId + this contract, so a
+///         spend authorization can never replay on another chain or another deployment. Each
+///         signature also binds an `epoch`; `grant` and `revoke` both bump the epoch, so a
+///         `revoke` durably kills every pre-signed-but-unsubmitted spend — even one signed for
+///         an unused nonce — and a later re-grant (fresh cap, `spent` reset) cannot resurrect it.
+contract SessionKeyDelegator is EIP712 {
     using ECDSA for bytes32;
-    using MessageHashUtils for bytes32;
+
+    bytes32 public constant SPEND_TYPEHASH =
+        keccak256("Spend(address parent,uint256 amount,uint256 nonce,uint256 epoch)");
 
     struct Session {
         uint256 cap;
         uint256 spent;
         uint64 expiry; // 0 = no expiry
         bool active;
+        uint256 epoch; // bumped on every grant/revoke; bound into each spend signature
     }
 
     /// @dev parent => sessionKey => Session
     mapping(address => mapping(address => Session)) public sessions;
-    /// @dev parent => sessionKey => next expected nonce (replay protection)
+    /// @dev parent => sessionKey => next expected nonce (replay protection; never reset)
     mapping(address => mapping(address => uint256)) public nonces;
 
     error NotActive();
     error Expired();
+    error BadExpiry();
     error CapExceeded(uint256 remaining, uint256 requested);
     error BadSignature();
     error BadNonce();
+    error BadEpoch();
 
-    event SessionGranted(address indexed parent, address indexed sessionKey, uint256 cap, uint64 expiry);
-    event SessionRevoked(address indexed parent, address indexed sessionKey);
+    event SessionGranted(
+        address indexed parent, address indexed sessionKey, uint256 cap, uint64 expiry, uint256 epoch
+    );
+    event SessionRevoked(address indexed parent, address indexed sessionKey, uint256 epoch);
     event Spent(address indexed parent, address indexed sessionKey, uint256 amount, uint256 totalSpent);
 
+    constructor() EIP712("tiagoh SessionKeyDelegator", "1") {}
+
     /// @notice Grant or replace a session key's spend cap and expiry (parent = caller).
+    ///         A grant is a fresh allowance: prior `spent` is cleared and the epoch is bumped,
+    ///         so any spend signed under a previous grant (submitted or not) is permanently dead.
     function grant(address sessionKey, uint256 cap, uint64 expiry) external {
+        if (expiry != 0 && expiry <= block.timestamp) revert BadExpiry();
         Session storage s = sessions[msg.sender][sessionKey];
         s.cap = cap;
+        s.spent = 0;
         s.expiry = expiry;
         s.active = true;
-        emit SessionGranted(msg.sender, sessionKey, cap, expiry);
+        s.epoch += 1;
+        emit SessionGranted(msg.sender, sessionKey, cap, expiry, s.epoch);
     }
 
-    /// @notice Revoke a session key immediately.
+    /// @notice Revoke a session key immediately. Bumping the epoch invalidates every spend that
+    ///         was signed but not yet submitted, so revoke is durable even if the key is re-granted.
     function revoke(address sessionKey) external {
-        sessions[msg.sender][sessionKey].active = false;
-        emit SessionRevoked(msg.sender, sessionKey);
+        Session storage s = sessions[msg.sender][sessionKey];
+        s.active = false;
+        s.epoch += 1;
+        emit SessionRevoked(msg.sender, sessionKey, s.epoch);
     }
 
     /// @notice Remaining spendable allowance for a session key.
@@ -57,23 +80,29 @@ contract SessionKeyDelegator {
         return s.cap > s.spent ? s.cap - s.spent : 0;
     }
 
-    /// @notice The message a session key signs to authorize a spend.
-    function spendHash(address parent, uint256 amount, uint256 nonce) public view returns (bytes32) {
-        return keccak256(abi.encodePacked(address(this), parent, amount, nonce));
+    /// @notice The EIP-712 digest a session key signs to authorize a spend. `epoch` must equal
+    ///         the session's current epoch (read `sessions(parent, key).epoch`).
+    function spendHash(address parent, uint256 amount, uint256 nonce, uint256 epoch)
+        public
+        view
+        returns (bytes32)
+    {
+        return _hashTypedDataV4(keccak256(abi.encode(SPEND_TYPEHASH, parent, amount, nonce, epoch)));
     }
 
-    /// @notice Record a spend authorized by the session key's signature; reverts past cap/expiry.
-    ///         The session key is recovered from the signature, so a relayer can submit it.
-    function spend(address parent, uint256 amount, uint256 nonce, bytes calldata signature)
+    /// @notice Record a spend authorized by the session key's signature; reverts past cap/expiry,
+    ///         on a stale epoch (post-revoke/re-grant), or a bad nonce. The session key is
+    ///         recovered from the signature, so a relayer can submit it.
+    function spend(address parent, uint256 amount, uint256 nonce, uint256 epoch, bytes calldata signature)
         external
         returns (address sessionKey)
     {
-        bytes32 digest = spendHash(parent, amount, nonce).toEthSignedMessageHash();
+        bytes32 digest = spendHash(parent, amount, nonce, epoch);
         sessionKey = digest.recover(signature);
-        if (sessionKey == address(0)) revert BadSignature();
 
         Session storage s = sessions[parent][sessionKey];
         if (!s.active) revert NotActive();
+        if (epoch != s.epoch) revert BadEpoch();
         if (s.expiry != 0 && block.timestamp > s.expiry) revert Expired();
         if (nonce != nonces[parent][sessionKey]) revert BadNonce();
 

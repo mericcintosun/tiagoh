@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IReceiptRegistry} from "./interfaces/IReceiptRegistry.sol";
 
 /// @title ReceiptRegistry
@@ -9,7 +9,7 @@ import {IReceiptRegistry} from "./interfaces/IReceiptRegistry.sol";
 ///         so the full payment graph reconstructs from chain data alone (PRD §5.0 C5).
 /// @dev    Recording is permissioned to gateway recorders. Receipts are immutable and
 ///         duplicate-protected by `receiptId`.
-contract ReceiptRegistry is Ownable, IReceiptRegistry {
+contract ReceiptRegistry is Ownable2Step, IReceiptRegistry {
     struct Receipt {
         bytes32 parentId;
         address payer;

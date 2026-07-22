@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /// @dev Minimal ERC-8004 Identity Registry surface used to gate agent binding.
 interface IIdentityRegistry {
@@ -16,7 +16,7 @@ interface IIdentityRegistry {
 ///         supply chain — an agent cannot be drained past its allowance at any depth.
 /// @dev    On GOAT this pairs with x402 DELEGATE settlement + ERC-4337 session keys as the
 ///         off-chain enforcement point; this contract is the on-chain allowance ledger.
-contract AgentRegistry is Ownable {
+contract AgentRegistry is Ownable2Step {
     struct Delegation {
         uint256 cap;
         uint256 spent;
@@ -34,6 +34,8 @@ contract AgentRegistry is Ownable {
 
     error NotAuthorizedForAgent();
     error AgentAlreadyBound();
+    error OperatorAlreadyBound();
+    error ZeroAgentId();
     error CapBelowSpent();
     error CapExceeded(address parent, address child, uint256 remaining, uint256 requested);
 
@@ -56,7 +58,10 @@ contract AgentRegistry is Ownable {
     /// @notice Bind the caller as operator of `agentId`. If an Identity Registry is set,
     ///         the caller must be authorized/owner of that ERC-8004 agent.
     function bindOperator(uint256 agentId) external {
+        if (agentId == 0) revert ZeroAgentId();
         if (operatorOf[agentId] != address(0)) revert AgentAlreadyBound();
+        // One operator, one agent: a second bind would silently orphan the reverse map.
+        if (agentIdOf[msg.sender] != 0) revert OperatorAlreadyBound();
         if (identityRegistry != address(0)) {
             if (!IIdentityRegistry(identityRegistry).isAuthorizedOrOwner(msg.sender, agentId)) {
                 revert NotAuthorizedForAgent();
@@ -81,9 +86,9 @@ contract AgentRegistry is Ownable {
     ///         own spends are gated the same way one level down.
     function spend(address child, uint256 amount) external {
         Delegation storage d = delegations[msg.sender][child];
-        uint256 remaining = d.cap - d.spent;
-        if (amount > remaining) {
-            revert CapExceeded(msg.sender, child, remaining, amount);
+        uint256 rem = d.cap - d.spent;
+        if (amount > rem) {
+            revert CapExceeded(msg.sender, child, rem, amount);
         }
         d.spent += amount;
         emit Spent(msg.sender, child, amount, d.spent);

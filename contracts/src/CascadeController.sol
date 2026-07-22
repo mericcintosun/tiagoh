@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -17,7 +17,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 ///         value propagates up the tree hop-by-hop. TODO(prod): compounding multi-level
 ///         attribution policies and per-hop `parentId` receipt anchoring live off-chain in
 ///         the gateway; wire them through ReceiptRegistry.
-contract CascadeController is Ownable, ReentrancyGuard {
+contract CascadeController is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS = 10_000;
@@ -73,17 +73,24 @@ contract CascadeController is Ownable, ReentrancyGuard {
         returns (uint256 cascadeId)
     {
         if (budget == 0) revert ZeroBudget();
+        // Book the amount actually received (fee-on-transfer / rebasing safe), so a hop can
+        // never be paid out against budget the contract does not hold.
+        IERC20 t = IERC20(token);
+        uint256 balBefore = t.balanceOf(address(this));
+        t.safeTransferFrom(msg.sender, address(this), budget);
+        uint256 received = t.balanceOf(address(this)) - balBefore;
+        if (received == 0) revert ZeroBudget();
+
         cascadeId = ++cascadeCount;
         cascades[cascadeId] = Cascade({
             opener: msg.sender,
-            token: IERC20(token),
-            budget: budget,
+            token: t,
+            budget: received,
             spent: 0,
             hopCount: 0,
             open: true
         });
-        IERC20(token).safeTransferFrom(msg.sender, address(this), budget);
-        emit CascadeOpened(cascadeId, msg.sender, token, budget);
+        emit CascadeOpened(cascadeId, msg.sender, token, received);
     }
 
     /// @notice Pay a hop within a cascade.

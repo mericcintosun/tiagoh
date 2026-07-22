@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IReputationRegistry} from "./interfaces/IReputationRegistry.sol";
 
 /// @title ReputationScorer
@@ -13,7 +13,7 @@ import {IReputationRegistry} from "./interfaces/IReputationRegistry.sol";
 /// @dev    Signals are written by authorized reporters (the gateway) and by the
 ///         DisputeArbiter (disputes/slashes). The linked ERC-8004 registry address is
 ///         stored so off-chain consumers can cross-reference the credibly-neutral source.
-contract ReputationScorer is Ownable {
+contract ReputationScorer is Ownable2Step {
     struct Signals {
         uint256 volume; // cumulative settled volume
         uint256 successes; // successful settled calls

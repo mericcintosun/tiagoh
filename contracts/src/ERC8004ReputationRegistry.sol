@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IFeedbackAuthorizer} from "./interfaces/IFeedbackAuthorizer.sol";
+
 /// @title ERC8004ReputationRegistry
 /// @notice A self-contained ERC-8004 Reputation Registry. The canonical ERC-8004 registry is an
 ///         upgradeable ERC-721 identity stack that is not deployed on GOAT Testnet3, so tiagoh ships
@@ -21,6 +23,12 @@ contract ERC8004ReputationRegistry {
     }
 
     int128 internal constant MAX_ABS_VALUE = int128(1_000_000) * int128(int256(1e18));
+
+    /// @notice Optional Sybil gate. When non-zero, every `giveFeedback` must be approved by this
+    ///         authorizer (e.g. a gateway allowlist or a receipt-gated check). When zero, the
+    ///         registry is fully permissionless — the ERC-8004 default. Immutable: a registry is
+    ///         either gated or open for its whole life, so there is no admin key to compromise.
+    IFeedbackAuthorizer public immutable feedbackAuthorizer;
 
     // agentId => subject (the tool/agent this reputation is about)
     mapping(uint256 => address) public subjectOf;
@@ -44,6 +52,7 @@ contract ERC8004ReputationRegistry {
     error ZeroSubject();
     error IndexOutOfBounds();
     error AlreadyRevoked();
+    error FeedbackNotAuthorized();
 
     event AgentRegistered(uint256 indexed agentId, address indexed subject);
     // Field ordering mirrors the reference ERC-8004 Reputation Registry event.
@@ -60,6 +69,12 @@ contract ERC8004ReputationRegistry {
         bytes32 feedbackHash
     );
     event FeedbackRevoked(uint256 indexed agentId, address indexed clientAddress, uint64 indexed feedbackIndex);
+
+    /// @param authorizer  Optional `IFeedbackAuthorizer`. Zero = permissionless (ERC-8004 default);
+    ///                    non-zero = Sybil-gated (e.g. a gateway allowlist / receipt gate).
+    constructor(address authorizer) {
+        feedbackAuthorizer = IFeedbackAuthorizer(authorizer);
+    }
 
     /// @notice Register a subject (a tool or agent address) and mint its ERC-8004 agent id.
     ///         Idempotent-friendly: reverts if the subject already has an id (read `agentOf` first).
@@ -88,6 +103,8 @@ contract ERC8004ReputationRegistry {
         if (subjectOf[agentId] == msg.sender) revert SelfFeedback();
         if (valueDecimals > 18) revert TooManyDecimals();
         if (value < -MAX_ABS_VALUE || value > MAX_ABS_VALUE) revert ValueOutOfRange();
+        // Optional Sybil gate: when an authorizer is configured, it must approve the write.
+        _requireAuthorized(agentId, subjectOf[agentId], value, feedbackHash);
 
         feedbackIndex = ++_lastIndex[agentId][msg.sender];
         _feedback[agentId][msg.sender][feedbackIndex] =
@@ -98,6 +115,18 @@ contract ERC8004ReputationRegistry {
             _clientExists[agentId][msg.sender] = true;
         }
         emit NewFeedback(agentId, msg.sender, feedbackIndex, value, valueDecimals, tag1, tag2, endpoint, feedbackURI, feedbackHash);
+    }
+
+    function _requireAuthorized(uint256 agentId, address subject, int128 value, bytes32 feedbackHash)
+        internal
+        view
+    {
+        IFeedbackAuthorizer auth = feedbackAuthorizer;
+        if (address(auth) != address(0)) {
+            if (!auth.canGiveFeedback(msg.sender, agentId, subject, value, feedbackHash)) {
+                revert FeedbackNotAuthorized();
+            }
+        }
     }
 
     function revokeFeedback(uint256 agentId, uint64 feedbackIndex) external {
