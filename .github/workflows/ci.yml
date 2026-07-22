@@ -34,5 +34,19 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - name: Fetch contract deps
         run: cd contracts && bash setup-deps.sh
-      - name: forge build + test
+      - name: forge build + test (unit + fuzz + invariant)
         run: cd contracts && forge build && forge test -vv
+
+  slither:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Fetch contract deps
+        run: cd contracts && bash setup-deps.sh
+      - name: Slither static analysis
+        uses: crytic/slither-action@v0.4.0
+        with:
+          target: contracts/
+          slither-config: contracts/slither.config.json
+          fail-on: high
