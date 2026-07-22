@@ -128,7 +128,7 @@ const NOW = 1_752_000_000_000; // fixed reference (deterministic SSR/CSR, no hyd
 // ── Hero stat tiles ─────────────────────────────────────────────────────────
 export const heroStats: StatTile[] = [
   { label: "contracts live", value: "15", sub: "GOAT mainnet", accent: "primary" },
-  { label: "contract tests", value: "28/28", sub: "all passing", accent: "success" },
+  { label: "contract tests", value: "63/63", sub: "all passing", accent: "success" },
   { label: "x402 flow", value: "end-to-end", sub: "pay per call", accent: "flow" },
   { label: "on-chain proof", value: "live txns", sub: "receipts + slash", accent: "warning" },
 ];

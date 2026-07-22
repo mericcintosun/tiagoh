@@ -74,7 +74,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-6 py-6 text-xs text-muted-foreground sm:flex-row">
-          <span className="font-mono">tiagoh testnet build · v0.1</span>
+          <span className="font-mono">tiagoh mainnet build · v0.1</span>
           <span>Numbers anchored on-chain. Read client-side, no backend.</span>
         </div>
       </div>

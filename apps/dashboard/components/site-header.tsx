@@ -51,7 +51,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden items-center gap-1.5 font-mono text-xs text-muted-foreground sm:inline-flex">
             <CurrencyBtc className="h-4 w-4 text-primary" weight="fill" />
-            GOAT testnet
+            GOAT mainnet
           </span>
           <ChainBadge />
           <ModeToggle />

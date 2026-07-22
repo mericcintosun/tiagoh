@@ -194,8 +194,8 @@ function SlideTrust() {
 
 function SlideTraction() {
   const tiles = [
-    { value: "13", label: "smart contracts live on GOAT testnet" },
-    { value: "28/28", label: "tests passing on real transactions" },
+    { value: "15", label: "smart contracts live on GOAT mainnet" },
+    { value: "63/63", label: "tests passing on real transactions" },
     { value: "1", label: "tool live in the ClawUp market" },
     { value: "0", label: "backend servers, the site reads the chain" },
   ];
@@ -264,7 +264,7 @@ function SlideNext() {
         className="mt-5 text-3xl font-semibold leading-tight tracking-tight md:text-5xl"
         style={serif}
       >
-        From the test net to real money.
+        Live on GOAT mainnet.
       </h2>
       <p className="mt-7 max-w-2xl text-lg leading-relaxed text-muted-foreground">
         The last piece we need is GOAT x402 faucet access. In our code it is a
