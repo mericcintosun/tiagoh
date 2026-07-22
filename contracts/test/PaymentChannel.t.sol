@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {PaymentChannel} from "../src/PaymentChannel.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
@@ -30,10 +29,9 @@ contract PaymentChannelTest is Test {
         id = channel.open(recipient, address(token), DEPOSIT, 1 days);
     }
 
+    /// @dev Vouchers are EIP-712 typed digests (chainId + contract bound).
     function _sign(uint256 id, uint256 cumulative) internal view returns (bytes memory) {
-        bytes32 digest =
-            MessageHashUtils.toEthSignedMessageHash(channel.voucherHash(id, cumulative));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, digest);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, channel.voucherHash(id, cumulative));
         return abi.encodePacked(r, s, v);
     }
 
@@ -72,10 +70,54 @@ contract PaymentChannelTest is Test {
     function test_redeem_badSignatureReverts() public {
         uint256 id = _open();
         // Sign with a different key.
-        bytes32 digest =
-            MessageHashUtils.toEthSignedMessageHash(channel.voucherHash(id, 100e6));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xBADD, digest);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(0xBADD, channel.voucherHash(id, 100e6));
         vm.expectRevert(PaymentChannel.BadSignature.selector);
         channel.redeem(id, 100e6, abi.encodePacked(r, s, v));
+    }
+
+    /// @dev F3 fix: the sender can no longer unilaterally `close()` and strip the recipient's
+    ///      unredeemed vouchers. Only the recipient may close early.
+    function test_close_senderCannotClose() public {
+        uint256 id = _open();
+        vm.prank(sender);
+        vm.expectRevert(PaymentChannel.NotRecipient.selector);
+        channel.close(id);
+    }
+
+    function test_close_recipientCloses_remainderToSender() public {
+        uint256 id = _open();
+        channel.redeem(id, 200e6, _sign(id, 200e6));
+        vm.prank(recipient);
+        channel.close(id);
+        assertEq(token.balanceOf(sender), DEPOSIT - 200e6, "remainder back to sender");
+        assertEq(token.balanceOf(recipient), 200e6, "recipient keeps earned");
+    }
+
+    /// @dev The sender's early exit requires the recipient's signed final amount, so the
+    ///      recipient is always made whole for what they earned.
+    function test_cooperativeClose_paysRecipientThenSender() public {
+        uint256 id = _open();
+        // Recipient signs a Close authorization for cumulative 300 (distinct from a voucher).
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, channel.closeHash(id, 300e6));
+        // Wrong signer: closeHash must be signed by the RECIPIENT. Here sender != recipient.
+        bytes memory badSig = abi.encodePacked(r, s, v);
+        vm.prank(sender);
+        vm.expectRevert(PaymentChannel.BadSignature.selector);
+        channel.cooperativeClose(id, 300e6, badSig);
+    }
+
+    function test_cooperativeClose_withRecipientSig() public {
+        // Recompute with a recipient whose key we control.
+        uint256 recipPk = 0xC0FFEE;
+        address recip = vm.addr(recipPk);
+        vm.prank(sender);
+        uint256 id = channel.open(recip, address(token), DEPOSIT, 1 days);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(recipPk, channel.closeHash(id, 400e6));
+        vm.prank(sender);
+        channel.cooperativeClose(id, 400e6, abi.encodePacked(r, s, v));
+
+        assertEq(token.balanceOf(recip), 400e6, "recipient paid final amount");
+        assertEq(token.balanceOf(sender), DEPOSIT - 400e6, "sender gets remainder");
     }
 }

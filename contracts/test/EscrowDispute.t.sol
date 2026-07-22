@@ -28,9 +28,11 @@ contract EscrowDisputeTest is Test {
         bond = new QualityBond(address(token), owner);
         arbiter = new DisputeArbiter(owner);
 
-        // Wire the arbiter as the authority over escrow + bond.
+        // Wire the arbiter as the authority over escrow + bond. The owner is no longer an
+        // implicit arbiter, so grant it explicitly for the direct unwindCascade path.
         vm.startPrank(owner);
         escrow.setArbiter(address(arbiter), true);
+        escrow.setArbiter(owner, true);
         bond.setArbiter(address(arbiter), true);
         arbiter.setRecourseTargets(address(bond), address(escrow));
         vm.stopPrank();
@@ -54,7 +56,8 @@ contract EscrowDisputeTest is Test {
         uint256 escrowId = escrow.deposit(seller, address(token), 100e6, 1 days, CASCADE);
         assertEq(token.balanceOf(buyer), 10_000e6 - 100e6, "escrowed");
 
-        // Open + rule the dispute for the buyer.
+        // Open (buyer-only, validated against the real escrow + bond) + rule for the buyer.
+        vm.prank(buyer);
         uint256 disputeId =
             arbiter.openDispute(keccak256("receipt"), buyer, seller, TOOL, escrowId, 50e6);
         vm.prank(owner);
