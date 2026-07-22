@@ -1,0 +1,32 @@
+{
+  "network": "GOAT Network (mainnet)",
+  "chainId": 2345,
+  "rpcUrl": "https://rpc.goat.network",
+  "rpcBackup": "https://rpc.ankr.com/goat_mainnet",
+  "explorer": "https://explorer.goat.network",
+  "deployer": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
+  "paymentToken": "0xb55822243ea12738A50De04B0AeE4f671732FFBb",
+  "note": "Guarded launch: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100. DemoToken is a labeled TEST token, not a real stablecoin. BitVM2Arbiter deployed but NOT authorized on bond/escrow until a real verifier is wired (see docs/SECURITY.md).",
+  "contracts": {
+    "DemoToken": "0xb55822243ea12738A50De04B0AeE4f671732FFBb",
+    "ReceiptRegistry": "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA",
+    "RevenueSplit": "0x0193b4865a13955EF646e6532cd024028165aBC5",
+    "CascadeController": "0xCed393a33e999C14a2E343DAA36fbEb84ce1A4E0",
+    "PaymentChannel": "0x283c174Abf7F868Cda7B038C4a45CbCa45Aa45A7",
+    "QualityBond": "0x0b592E60706695Dc1E84bFda4f2ec59dc660e980",
+    "EscrowVault": "0x10d7eC7fEbCB3009e2842B35616eA1609249C695",
+    "DisputeArbiter": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
+    "ReputationScorer": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215",
+    "ToolAuction": "0x28066960D5f655f9bEbe4B13241b3731F6f04FF7",
+    "AgentRegistry": "0xF509B481c8E07F31442C61F0eF6216C10Fa7CB8a",
+    "SessionKeyDelegator": "0x1606b7eaB84248b5a48104845398D36E2860FD36",
+    "FeedbackAllowlist": "0xc0C67BE44b5A2819C270110d7E04C2bB310E98f6",
+    "ERC8004ReputationRegistry": "0x5002C61966CdA580b16D5f2B08F43FCC71857Fc7",
+    "BitVM2Arbiter": "0x6C41430855934E8d8c0A2E9F90BfEC6d5A15144d"
+  },
+  "liveProofs": {
+    "genesisReceipt": "ReceiptRegistry.count == 1, totalVolume == 100 (get_goat_market_data)",
+    "erc8004Feedback": "agent registered for RevenueSplit, +100 success feedback anchored",
+    "guardedCaps": "EscrowVault.maxEscrow == 50000000 (50 tUSDdemo)"
+  }
+}
