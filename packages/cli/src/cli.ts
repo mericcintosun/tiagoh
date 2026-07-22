@@ -45,6 +45,39 @@ program
       new StdioClientTransport({ command: config.upstream.command, args: config.upstream.args }),
     );
 
+    // Real x402 settlement when a facilitator is configured (config.facilitatorUrl); otherwise a
+    // local mock so the demo runs without a live facilitator. The private key (for anchoring
+    // receipts on-chain) comes from env and is never written to config.
+    const pk = process.env.TIAGOH_PRIVATE_KEY as `0x${string}` | undefined;
+    let settle: ConstructorParameters<typeof TiagohGateway>[0]["settle"];
+    let verifyPayment: ConstructorParameters<typeof TiagohGateway>[0]["verifyPayment"];
+
+    if (config.facilitatorUrl) {
+      const goat = await import("@tiagoh/goat");
+      const facilitator = {
+        facilitatorUrl: config.facilitatorUrl,
+        payTo: config.payTo as `0x${string}`,
+        asset: config.asset as `0x${string}`,
+        network: `goat:${config.chainId}`,
+        apiKey: process.env.X402_FACILITATOR_KEY,
+        // Anchor the settled call on-chain when a signer is available.
+        anchor: pk
+          ? goat.createOnchainSettle({
+              privateKey: pk,
+              receiptRegistry: process.env.RECEIPT_REGISTRY_ADDRESS as `0x${string}`,
+              token: config.asset as `0x${string}`,
+              payee: config.payTo as `0x${string}`,
+            })
+          : undefined,
+      };
+      verifyPayment = goat.createFacilitatorVerify(facilitator);
+      settle = goat.createFacilitatorSettle(facilitator);
+      console.log(`  x402 facilitator: ${config.facilitatorUrl} (verify + settle live)`);
+    } else {
+      settle = async ({ tool }) => ({ txHash: `mock:${tool}`, payee: config.payTo });
+      console.log("  x402 facilitator: none (mock settle) — set facilitatorUrl for real payments");
+    }
+
     const gateway = new TiagohGateway({
       config,
       listUpstream: async () => {
@@ -55,9 +88,8 @@ program
         const res = await client.callTool({ name: tool, arguments: (args ?? {}) as Record<string, unknown> });
         return res;
       },
-      // Local mock facilitator by default; a real facilitator/on-chain settle is a swap-in
-      // (see @tiagoh/goat createOnchainSettle / createFacilitatorSettle).
-      settle: async ({ tool }) => ({ txHash: `mock:${tool}`, payee: config.payTo }),
+      verifyPayment,
+      settle,
     });
 
     gateway.serve(config.port);

@@ -100,29 +100,145 @@ export function createOnchainSettle(opts: OnchainSettleOptions) {
   };
 }
 
-export interface FacilitatorSettleOptions {
-  /** Hosted GOAT x402 facilitator endpoint (verify + settle). */
+export interface FacilitatorOptions {
+  /** Hosted GOAT x402 facilitator endpoint (exposes POST /verify and POST /settle). */
   facilitatorUrl: string;
+  /** Seller payout address (the `payTo` the facilitator settles to). */
+  payTo: Address;
   /** ERC-3009 / Permit2 payment token the facilitator settles. */
-  token: Address;
-  privateKey: Hex;
-  receiptRegistry?: Address;
-  rpcUrl?: string;
+  asset: Address;
+  /** CAIP-2-ish network id advertised in payment requirements, e.g. "goat:48816". */
+  network?: string;
+  /** Optional bearer key for the facilitator. */
+  apiKey?: string;
+  /** Injected fetch (defaults to global fetch; Node 20+). */
+  fetchImpl?: typeof fetch;
+  /**
+   * Optional receipt anchor run after a successful settle — pass `createOnchainSettle(...)` (or a
+   * thin wrapper) to write the ReceiptRegistry entry once the facilitator has moved the money.
+   */
+  anchor?: (a: {
+    paymentId: string;
+    tool: string;
+    amountUsd: number;
+    parentId: string | null;
+  }) => Promise<{ txHash: string; payee: Address }>;
+}
+
+/** Decode the client's X-PAYMENT header value (raw JSON or base64 JSON) into a payload object. */
+function decodePaymentPayload(signature: string): unknown {
+  const s = signature.trim();
+  if (s.startsWith("{")) {
+    try {
+      return JSON.parse(s);
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    return JSON.parse(Buffer.from(s, "base64").toString("utf8"));
+  } catch {
+    // Not decodable JSON — forward the raw string; the facilitator rejects malformed payloads.
+    return s;
+  }
+}
+
+function requirements(opts: FacilitatorOptions, tool: string, amountUsd: number) {
+  return {
+    scheme: "exact",
+    network: opts.network ?? "goat:48816",
+    asset: opts.asset,
+    payTo: opts.payTo,
+    // USDC-style 6-decimal minor units; adjust per the deployment's payment token.
+    maxAmountRequired: String(Math.max(0, Math.round(amountUsd * 1e6))),
+    resource: `tool:${tool}`,
+    mimeType: "application/json",
+  };
 }
 
 /**
- * PREPARED — the real settlement path, awaiting GOAT x402 Integration Faucet access
- * (payment token + facilitator endpoint). Instead of anchoring a receipt from a mock
- * signature, this verifies the buyer's signed ERC-3009 / Permit2 authorization and
- * settles it through the hosted GOAT facilitator using @goatnetwork/agentkit's x402
- * adapters (HttpMerchantGatewayAdapter + submitSignatureAction), then anchors the
- * receipt. Swap `createOnchainSettle` for this once the faucet is granted — the gateway
- * `SettleFn` shape is unchanged, so nothing else moves.
+ * The REAL x402 verify step (facilitator POST /verify). Returns true only if the facilitator
+ * confirms the buyer's signed authorization is valid and settleable. Wire it into the gateway's
+ * `verifyPayment` hook so the seller never runs a tool against a signature that cannot settle.
+ * Any transport/error → false (fail closed → the gateway re-challenges with 402).
  */
-export function createFacilitatorSettle(_opts: FacilitatorSettleOptions): never {
-  throw new Error(
-    "createFacilitatorSettle: awaiting GOAT x402 facilitator access (x402 Integration Faucet). " +
-      "Wire @goatnetwork/agentkit HttpMerchantGatewayAdapter.verify + submitSignatureAction here, " +
-      "then anchor via createOnchainSettle's ReceiptRegistry write.",
-  );
+export function createFacilitatorVerify(opts: FacilitatorOptions) {
+  const doFetch = opts.fetchImpl ?? fetch;
+  return async (args: {
+    tool: string;
+    priceUsd: number;
+    asset: string;
+    signature: string;
+    payer: string;
+    parentId: string | null;
+  }): Promise<boolean> => {
+    const res = await doFetch(`${opts.facilitatorUrl.replace(/\/$/, "")}/verify`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        x402Version: 1,
+        paymentPayload: decodePaymentPayload(args.signature),
+        paymentRequirements: requirements(opts, args.tool, args.priceUsd),
+      }),
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { isValid?: boolean; valid?: boolean };
+    return body.isValid === true || body.valid === true;
+  };
+}
+
+/**
+ * The REAL settlement path (facilitator POST /settle): the facilitator submits the buyer's
+ * signed ERC-3009 / Permit2 authorization on-chain, then we anchor the receipt. Drop-in for
+ * `createOnchainSettle` as the gateway `SettleFn` once the GOAT x402 faucet/endpoint is granted —
+ * the SettleFn shape is unchanged, so nothing else moves. Env-gated: only used when a
+ * `facilitatorUrl` is configured.
+ */
+export function createFacilitatorSettle(opts: FacilitatorOptions) {
+  const doFetch = opts.fetchImpl ?? fetch;
+  return async (args: {
+    paymentId: string;
+    tool: string;
+    amountUsd: number;
+    payer: string;
+    parentId: string | null;
+    signature: string;
+  }): Promise<{ txHash?: string; payee: Address }> => {
+    const res = await doFetch(`${opts.facilitatorUrl.replace(/\/$/, "")}/settle`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        x402Version: 1,
+        paymentPayload: decodePaymentPayload(args.signature),
+        paymentRequirements: requirements(opts, args.tool, args.amountUsd),
+      }),
+    });
+    if (!res.ok) throw new Error(`facilitator settle failed: HTTP ${res.status}`);
+    const body = (await res.json()) as {
+      success?: boolean;
+      errorReason?: string;
+      transaction?: string;
+      txHash?: string;
+    };
+    if (!body.success) throw new Error(`facilitator settle rejected: ${body.errorReason ?? "unknown"}`);
+
+    const txHash = body.transaction ?? body.txHash;
+    // Anchor the settled call on-chain (ReceiptRegistry) if an anchor was provided.
+    if (opts.anchor) {
+      const anchored = await opts.anchor({
+        paymentId: args.paymentId,
+        tool: args.tool,
+        amountUsd: args.amountUsd,
+        parentId: args.parentId,
+      });
+      return { txHash: txHash ?? anchored.txHash, payee: anchored.payee };
+    }
+    return { txHash, payee: opts.payTo };
+  };
 }

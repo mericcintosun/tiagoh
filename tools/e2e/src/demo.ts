@@ -16,14 +16,15 @@ const receipts: Receipt[] = [];
 
 async function callUpstream(
   tool: string,
-  args: { asset?: string } | undefined,
+  rawArgs: unknown,
   ctx: { paymentId: string; parentId: string | null },
 ): Promise<unknown> {
+  const args = (rawArgs ?? {}) as { asset?: string };
   switch (tool) {
     case "get_goat_market_data":
       return { btcUsd: 98342.11, goatTvlUsd: 41_200_000 };
     case "get_rwa_price":
-      return { asset: args?.asset ?? "gold", priceUsd: 4095.83 };
+      return { asset: args.asset ?? "gold", priceUsd: 4095.83 };
     case "get_defi_yields":
       return { yields: [{ protocol: "stBTC", apy: 6.2 }] };
     case "analyze_portfolio": {

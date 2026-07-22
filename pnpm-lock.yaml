@@ -169,6 +169,9 @@ importers:
       '@tiagoh/gateway':
         specifier: workspace:*
         version: link:../gateway
+      '@tiagoh/goat':
+        specifier: workspace:*
+        version: link:../goat
       commander:
         specifier: ^12.1.0
         version: 12.1.0

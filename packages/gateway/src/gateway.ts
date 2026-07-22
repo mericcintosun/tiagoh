@@ -13,6 +13,15 @@ export type SettleFn = (args: {
   signature: string;
 }) => Promise<{ txHash?: string; payee: string }>;
 
+export type VerifyPaymentFn = (args: {
+  tool: string;
+  priceUsd: number;
+  asset: string;
+  signature: string;
+  payer: string;
+  parentId: string | null;
+}) => Promise<boolean>;
+
 export type UpstreamCall = (
   tool: string,
   args: unknown,
@@ -28,6 +37,14 @@ export interface GatewayOptions {
   listUpstream?: UpstreamList;
   /** Settles an x402 payment via the GOAT facilitator (see @tiagoh/goat). */
   settle: SettleFn;
+  /**
+   * Verifies the payment authorization BEFORE the upstream tool runs (the x402
+   * verify step; the facilitator's /verify on mainnet). An invalid or unverifiable
+   * signature is re-challenged with a 402 instead of executing the tool, so the
+   * seller never does work against a signature that cannot settle. When unset,
+   * verification is deferred entirely to `settle` (mock/testnet behavior).
+   */
+  verifyPayment?: VerifyPaymentFn;
   /** Sink for anchored receipts (e.g. ReceiptRegistry writer). */
   onReceipt?: (receipt: Receipt) => void;
 }
@@ -73,7 +90,28 @@ export class TiagohGateway {
       return { kind: "payment_required", priceUsd: price.priceUsd, asset: this.config.asset };
     }
 
-    // Paid → mint the paymentId, run upstream FIRST (it may cascade using this id
+    // Paid → verify the authorization first (never run the tool against a signature
+    // that cannot settle). A failed or errored verification re-challenges with 402.
+    if (this.opts.verifyPayment) {
+      let valid = false;
+      try {
+        valid = await this.opts.verifyPayment({
+          tool: input.tool,
+          priceUsd: price.priceUsd,
+          asset: this.config.asset,
+          signature: input.signature,
+          payer,
+          parentId,
+        });
+      } catch {
+        valid = false;
+      }
+      if (!valid) {
+        return { kind: "payment_required", priceUsd: price.priceUsd, asset: this.config.asset };
+      }
+    }
+
+    // Mint the paymentId, run upstream FIRST (it may cascade using this id
     // as the parent), and only settle if the tool succeeds (charge-on-success).
     const paymentId = randomUUID();
     const result = await this.opts.callUpstream(input.tool, input.args, { paymentId, parentId });
