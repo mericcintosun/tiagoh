@@ -128,7 +128,7 @@ const NOW = 1_752_000_000_000; // fixed reference (deterministic SSR/CSR, no hyd
 // ── Hero stat tiles ─────────────────────────────────────────────────────────
 export const heroStats: StatTile[] = [
   { label: "contracts live", value: "15", sub: "GOAT mainnet", accent: "primary" },
-  { label: "contract tests", value: "63/63", sub: "all passing", accent: "success" },
+  { label: "contract tests", value: "162/162", sub: "unit · fuzz · invariant", accent: "success" },
   { label: "x402 flow", value: "end-to-end", sub: "pay per call", accent: "flow" },
   { label: "on-chain proof", value: "live txns", sub: "receipts + slash", accent: "warning" },
 ];
@@ -555,17 +555,18 @@ export const disputes: Dispute[] = [
 
 // ── Contracts grid ──────────────────────────────────────────────────────────
 export const contractGrid: ContractInfo[] = [
-  { name: "ReceiptRegistry", purpose: "Anchor settled receipts + cascade parentId", address: deployedContracts.receiptRegistry, status: "live" },
+  { name: "ReceiptRegistry", purpose: "Anchor receipts; co-signed ones are dispute evidence", address: deployedContracts.receiptRegistry, status: "live" },
   { name: "RevenueSplit", purpose: "Pull-based fixed-weight revenue splits", address: deployedContracts.revenueSplit, status: "live" },
-  { name: "CascadeController", purpose: "Budget tree, per-hop cap, recursive attribution", address: deployedContracts.cascadeController, status: "live" },
+  { name: "CascadeController", purpose: "Budget tree, capped sub-budgets, recursive attribution", address: deployedContracts.cascadeController, status: "live" },
   { name: "PaymentChannel", purpose: "Prepaid channels, signed vouchers, redeem", address: deployedContracts.paymentChannel, status: "live" },
-  { name: "QualityBond", purpose: "Stake, slash, bond-backed refund", address: deployedContracts.qualityBond, status: "live" },
-  { name: "EscrowVault", purpose: "Conditional hold + atomic cascade unwind", address: deployedContracts.escrowVault, status: "live" },
-  { name: "DisputeArbiter", purpose: "Dispute window + ruling, BitVM2 hook", address: deployedContracts.disputeArbiter, status: "live" },
-  { name: "ReputationScorer", purpose: "Aggregate score over receipts + slashes", address: deployedContracts.reputationScorer, status: "live" },
-  { name: "ToolAuction", purpose: "Open request, collect bids, clear + settle", address: deployedContracts.toolAuction, status: "live" },
+  { name: "QualityBond", purpose: "Stake, slash, permanent slash history, post-slash lock", address: deployedContracts.qualityBond, status: "live" },
+  { name: "EscrowVault", purpose: "Conditional hold, seller claim on timeout, atomic unwind", address: deployedContracts.escrowVault, status: "live" },
+  { name: "DisputeArbiter", purpose: "Harm-bound rulings against a co-signed receipt or escrow", address: deployedContracts.disputeArbiter, status: "live" },
+  { name: "ReputationScorer", purpose: "Per-tool score, capped by the tool's live bond (Sybil defence)", address: deployedContracts.reputationScorer, status: "live" },
+  { name: "ToolAuction", purpose: "Bonded bids, clear by policy, delivery obligation", address: deployedContracts.toolAuction, status: "live" },
   { name: "AgentRegistry", purpose: "ERC-8004 identity + capped delegation", address: deployedContracts.agentRegistry, status: "live" },
   { name: "SessionKeyDelegator", purpose: "ERC-4337 session keys: capped, signed, revocable spend", address: deployedContracts.sessionKeyDelegator, status: "live" },
-  { name: "BitVM2Arbiter", purpose: "Optimistic dispute ruling, BitVM2 fraud-proof challenge", address: deployedContracts.bitVM2Arbiter, status: "live" },
+  { name: "BitVM2Arbiter", purpose: "Optimistic ruling — deployed, deliberately not yet authorized", address: deployedContracts.bitVM2Arbiter, status: "live" },
   { name: "ERC8004ReputationRegistry", purpose: "ERC-8004 feedback written from settlement outcomes", address: deployedContracts.erc8004ReputationRegistry, status: "live" },
+  { name: "DemoToken", purpose: "Labeled TEST payment token — not a stablecoin", address: deployedContracts.demoToken, status: "live" },
 ];

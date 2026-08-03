@@ -195,7 +195,7 @@ function SlideTrust() {
 function SlideTraction() {
   const tiles = [
     { value: "15", label: "smart contracts live on GOAT mainnet" },
-    { value: "63/63", label: "tests passing on real transactions" },
+    { value: "162/162", label: "contract tests passing (unit, fuzz, invariant)" },
     { value: "1", label: "tool live in the ClawUp market" },
     { value: "0", label: "backend servers, the site reads the chain" },
   ];

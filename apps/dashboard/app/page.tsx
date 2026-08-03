@@ -159,7 +159,7 @@ const ROADMAP = [
   {
     phase: "shipped",
     tone: "success" as const,
-    items: ["15 contracts live on GOAT mainnet", "x402 pay-per-call flow", "cascade payments + receipts", "bond slash + atomic refund"],
+    items: ["16 contracts live on GOAT mainnet", "x402 pay-per-call flow", "cascade payments + receipts", "bond slash + atomic refund"],
   },
   {
     phase: "next",
@@ -467,7 +467,7 @@ export default function LandingPage() {
           <SectionHeading
             eyebrow="Contracts"
             title="Fifteen Solidity contracts, live on GOAT mainnet"
-            lead="All fifteen are deployed on GOAT mainnet, and 63 of 63 tests pass. Every address below is real and resolves on the block explorer."
+            lead="All sixteen are deployed on GOAT mainnet, and 162 of 162 contract tests pass alongside 71 TypeScript tests. Every address below is real and resolves on the block explorer."
           />
           <div className="mt-10 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-2">
             {contractGrid.map((c, i) => (
