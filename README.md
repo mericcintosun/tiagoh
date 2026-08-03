@@ -26,50 +26,59 @@ not marketing. Everything settles on GOAT Network with Bitcoin finality.
 
 ## What is live right now
 
-- **15 Solidity contracts on GOAT Network mainnet** (chainId 2345), with real receipts anchored on
-  chain, including an ERC-4337 session-key enforcer, a BitVM2 optimistic arbiter, and an ERC-8004
-  reputation registry written from settlement outcomes. 63 of 63 tests passing (unit, fuzz, and
-  invariant). Launched with guarded value caps ahead of a full audit. Addresses in
-  [contracts/deployments/goat-mainnet.json](contracts/deployments/goat-mainnet.json); see
-  [SECURITY.md](docs/SECURITY.md) for the threat model.
-- **End to end x402 flow**: gateway answers 402, the client pays under budget, the tool runs, and only
-  a successful call is billed. Run it with `pnpm --filter @tiagoh/e2e demo`.
-- **Autonomous buyer** that reads reputation, pays per call, verifies each output, and disputes bad
-  ones. Run it with `pnpm --filter @tiagoh/e2e agent`.
+- **16 Solidity contracts** (Foundry), covering settlement, escrow, disputes, bonds, reputation,
+  auctions, cascades, payment channels, an ERC-4337 session-key allowance ledger, a BitVM2
+  optimistic arbiter and an ERC-8004 reputation registry. **160 of 160 contract tests passing**
+  (unit, fuzz, invariant) plus **71 TypeScript tests**. See [SECURITY.md](docs/SECURITY.md) for
+  the threat model and the two hardening passes.
+- **End to end x402 flow**: the gateway answers 402 with a single-use challenge, the client pays
+  under budget and pre-signs the receipt, the tool runs, only a successful call is billed, and the
+  settled receipt carries **both parties' signatures**. Replaying a spent challenge neither
+  re-executes the tool nor bills again. Run it with `pnpm --filter @tiagoh/e2e demo`.
+- **Autonomous buyer** that reads bond-capped on-chain reputation, pays per call, verifies each
+  output, and disputes the bad ones against a co-signed receipt. Run it with
+  `pnpm --filter @tiagoh/e2e agent`.
 - **Live dashboard** at [tiagoh.vercel.app](https://tiagoh.vercel.app) that reads the deployed
   contracts client side, no backend.
 - **Hosted MCP endpoint** at [/api/mcp](https://tiagoh.vercel.app/api/mcp), listed in the ClawUp MCP
   marketplace, usable by any OpenClaw or ClawUp agent.
+
+> The addresses in [contracts/deployments/goat-mainnet.json](contracts/deployments/goat-mainnet.json)
+> are the **pre-hardening** deployment (GOAT mainnet, chainId 2345). The second hardening pass
+> changed storage layouts and signatures, so the suite needs redeploying before those addresses
+> match the code here — see the mainnet gates in [SECURITY.md](docs/SECURITY.md).
 
 ## Features
 
 | Feature | What it does |
 | --- | --- |
 | Wrap | `tiagoh wrap` puts an x402 paywall in front of any MCP server, unchanged |
-| Cascade | multi hop payments with one budget cap and recursive revenue attribution |
-| Quality bonds | a tool stakes a bond, slashed to refund the buyer on bad output |
-| Escrow and dispute | conditional payment, atomic multi hop refund, buyer favorable ruling |
-| Reputation | on chain score built from real receipts, refunds, and slashes |
-| Reverse auction | tools bid to serve a request, best price or reputation weighted wins |
+| Cascade | multi hop payments with one budget cap, capped sub budgets, and recursive revenue attribution |
+| Quality bonds | a tool stakes a bond, slashed to compensate the buyer on bad output |
+| Escrow and dispute | conditional payment, atomic multi hop refund, harm bound rulings |
+| Co signed receipts | every settled call signed by buyer **and** seller, so neither can forge or suppress the record |
+| Reputation | on chain score built from real receipts, capped by the tool's live bond |
+| Reverse auction | tools bid to serve a request, backed by a bid bond and a delivery obligation |
 | Delegation | an agent grants another a capped, sub delegatable spend budget |
-| Receipts | every settled call anchored on chain with its cascade parent link |
 
 ## Run the demos
 
 ```bash
 pnpm install && pnpm -r --filter "./packages/**" build
 
-# End to end x402 flow: per call payment, charge on success, a 3 hop cascade, budget rejection
+# End to end x402 flow: per call payment, charge on success, replay protection,
+# a 3 hop cascade, budget rejection, co signed receipts
 pnpm --filter @tiagoh/e2e demo
 
-# Same flow, anchoring real receipts to ReceiptRegistry on GOAT (testnet or mainnet)
+# Same flow, anchoring real receipts to ReceiptRegistry on GOAT
 TIAGOH_ONCHAIN=1 PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e demo
 
 # Autonomous buyer: discover, read reputation, pay, verify, dispute bad output
 pnpm --filter @tiagoh/e2e agent
 
-# Contracts (unit + fuzz + invariant)
-pnpm contracts:setup && pnpm contracts:test    # 63/63
+# Everything: TypeScript unit tests + contracts (unit + fuzz + invariant)
+pnpm test                                      # 71/71
+pnpm contracts:setup && pnpm contracts:test    # 160/160
 ```
 
 Full reviewer path: [docs/testing-playbook.md](docs/testing-playbook.md).
@@ -83,8 +92,8 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
                                      ▼
                          GOAT Network mainnet contracts
    ReceiptRegistry · CascadeController · QualityBond · EscrowVault · DisputeArbiter
-   ReputationScorer · ToolAuction · AgentRegistry · RevenueSplit · PaymentChannel
-   SessionKeyDelegator (ERC-4337) · BitVM2Arbiter · ERC8004ReputationRegistry
+   DisputeHarmBinding · ReputationScorer · ToolAuction · AgentRegistry · RevenueSplit
+   PaymentChannel · SessionKeyDelegator · BitVM2Arbiter · ERC8004ReputationRegistry
 ```
 
 | Path | What |
@@ -107,12 +116,23 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 
 ## Honest scope
 
-The contracts are live on GOAT mainnet and hardened (adversarial review plus fuzz and invariant
-tests), but launched with guarded value caps and are not yet independently audited. See
-[SECURITY.md](docs/SECURITY.md) for the threat model and the mainnet gates. Payment signing in the
-demos is a local mock; real settlement through GOAT's hosted x402 facilitator lands as a one line
-swap (`createFacilitatorVerify` / `createFacilitatorSettle` in `@tiagoh/goat`) once the facilitator
-endpoint is wired.
+- **The contracts are hardened but not audited**, and the code here is ahead of the deployed
+  addresses — the second hardening pass changed storage layouts, so the suite needs redeploying.
+  [SECURITY.md](docs/SECURITY.md) lists every finding, the residual risks, and the mainnet gates.
+- **Payment signing in the demos is a local mock.** The signature binds the challenge nonce so
+  the replay guard is exercised for real, but no money moves. Real settlement through GOAT's
+  hosted x402 facilitator is a one line swap (`createFacilitatorVerify` /
+  `createFacilitatorSettle` in `@tiagoh/goat`) once the endpoint is wired. Until then the gateway
+  will not serve priced tools unless you explicitly set `allowUnverifiedPayments`.
+- **Judging output quality is still the open problem.** Bonds and disputes give a buyer real
+  recourse, but only once something decides an output was bad. The shipped verifier catches
+  objective failures (empty, errored, missing fields); it does not catch plausible-but-fabricated
+  data, and a fraud proof cannot decide that either — BitVM2 proves deterministic execution, not
+  truth about the world. The direction that actually shrinks the problem is making tools attest to
+  their inputs and sources, so a dispute becomes a signature check rather than a judgement call.
+  See [SECURITY.md §5](docs/SECURITY.md).
+- **`DemoToken` is a labeled test token**, not a stablecoin. GOAT mainnet has bridged USDC.e at
+  `0x3022b87ac063DE95b1570F46f5e470F8B53112D8`; pointing `asset` at it is a config change.
 
 ## Tech
 

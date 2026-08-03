@@ -68,7 +68,9 @@ contract ERC8004ReputationRegistry {
         string feedbackURI,
         bytes32 feedbackHash
     );
-    event FeedbackRevoked(uint256 indexed agentId, address indexed clientAddress, uint64 indexed feedbackIndex);
+    event FeedbackRevoked(
+        uint256 indexed agentId, address indexed clientAddress, uint64 indexed feedbackIndex
+    );
 
     /// @param authorizer  Optional `IFeedbackAuthorizer`. Zero = permissionless (ERC-8004 default);
     ///                    non-zero = Sybil-gated (e.g. a gateway allowlist / receipt gate).
@@ -107,20 +109,34 @@ contract ERC8004ReputationRegistry {
         _requireAuthorized(agentId, subjectOf[agentId], value, feedbackHash);
 
         feedbackIndex = ++_lastIndex[agentId][msg.sender];
-        _feedback[agentId][msg.sender][feedbackIndex] =
-            Feedback({value: value, valueDecimals: valueDecimals, tag1: tag1, tag2: tag2, isRevoked: false});
+        _feedback[agentId][msg.sender][feedbackIndex] = Feedback({
+            value: value, valueDecimals: valueDecimals, tag1: tag1, tag2: tag2, isRevoked: false
+        });
 
         if (!_clientExists[agentId][msg.sender]) {
             _clients[agentId].push(msg.sender);
             _clientExists[agentId][msg.sender] = true;
         }
-        emit NewFeedback(agentId, msg.sender, feedbackIndex, value, valueDecimals, tag1, tag2, endpoint, feedbackURI, feedbackHash);
+        emit NewFeedback(
+            agentId,
+            msg.sender,
+            feedbackIndex,
+            value,
+            valueDecimals,
+            tag1,
+            tag2,
+            endpoint,
+            feedbackURI,
+            feedbackHash
+        );
     }
 
-    function _requireAuthorized(uint256 agentId, address subject, int128 value, bytes32 feedbackHash)
-        internal
-        view
-    {
+    function _requireAuthorized(
+        uint256 agentId,
+        address subject,
+        int128 value,
+        bytes32 feedbackHash
+    ) internal view {
         IFeedbackAuthorizer auth = feedbackAuthorizer;
         if (address(auth) != address(0)) {
             if (!auth.canGiveFeedback(msg.sender, agentId, subject, value, feedbackHash)) {
@@ -130,7 +146,9 @@ contract ERC8004ReputationRegistry {
     }
 
     function revokeFeedback(uint256 agentId, uint64 feedbackIndex) external {
-        if (feedbackIndex == 0 || feedbackIndex > _lastIndex[agentId][msg.sender]) revert IndexOutOfBounds();
+        if (feedbackIndex == 0 || feedbackIndex > _lastIndex[agentId][msg.sender]) {
+            revert IndexOutOfBounds();
+        }
         Feedback storage fb = _feedback[agentId][msg.sender][feedbackIndex];
         if (fb.isRevoked) revert AlreadyRevoked();
         fb.isRevoked = true;
@@ -140,7 +158,13 @@ contract ERC8004ReputationRegistry {
     function readFeedback(uint256 agentId, address client, uint64 feedbackIndex)
         external
         view
-        returns (int128 value, uint8 valueDecimals, string memory tag1, string memory tag2, bool isRevoked)
+        returns (
+            int128 value,
+            uint8 valueDecimals,
+            string memory tag1,
+            string memory tag2,
+            bool isRevoked
+        )
     {
         Feedback storage fb = _feedback[agentId][client][feedbackIndex];
         return (fb.value, fb.valueDecimals, fb.tag1, fb.tag2, fb.isRevoked);
@@ -158,7 +182,11 @@ contract ERC8004ReputationRegistry {
     /// @return count      number of feedback entries counted
     /// @return sumWad     sum of values normalized to 18 decimals
     /// @return averageWad sumWad / count (0 when count is 0)
-    function getSummary(uint256 agentId) external view returns (uint64 count, int256 sumWad, int256 averageWad) {
+    function getSummary(uint256 agentId)
+        external
+        view
+        returns (uint64 count, int256 sumWad, int256 averageWad)
+    {
         address[] storage clients = _clients[agentId];
         for (uint256 i; i < clients.length; i++) {
             address client = clients[i];

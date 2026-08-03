@@ -1,19 +1,40 @@
-import { TIAGOH } from "@tiagoh/core";
+import { TIAGOH, parseMinor } from "@tiagoh/core";
 import { BudgetGuard } from "./budget.js";
+
+/** The 402 body a gateway answers with. */
+export interface PaymentChallenge {
+  /** Minor units of `asset`, base-10 integer string. */
+  amount: string;
+  asset: string;
+  assetDecimals: number;
+  network: string;
+  payTo: string;
+  tool: string;
+  nonce: string;
+  receiptId: string;
+  expiresAt: number;
+}
 
 export interface PayingFetchOptions {
   budget: BudgetGuard;
-  /** Signs the x402 authorization for a 402 challenge; returns the signature. */
-  sign: (challenge: { priceUsd: number; asset: string }) => Promise<string>;
+  /** Signs the x402 payment authorization for a challenge. */
+  sign: (challenge: PaymentChallenge) => Promise<string>;
+  /**
+   * Signs the receipt this call will produce (EIP-712, over the deterministic `receiptId` in
+   * the challenge). The gateway counter-signs, and the result is a receipt neither side can
+   * forge — the only kind `DisputeArbiter` accepts as proof of harm. Omit it and the call still
+   * works, but the buyer gives up their recourse.
+   */
+  signReceipt?: (challenge: PaymentChallenge) => Promise<string>;
   /** Cascade parent id to propagate downstream, if this call is itself a hop. */
   parentId?: string | null;
   fetchImpl?: typeof fetch;
 }
 
 /**
- * A paying `fetch`: on a 402 it checks the budget, aborts *before signing* if
- * the price would breach a cap, otherwise signs and retries. Propagates the
- * cascade parent id so downstream receipts link back to their parent.
+ * A paying `fetch`: on a 402 it checks the budget, aborts *before signing* if the price would
+ * breach a cap, otherwise signs and retries — echoing the challenge nonce so the payment is
+ * single-use, and pre-signing the receipt so the settled call produces real evidence.
  */
 export function createPayingFetch(opts: PayingFetchOptions) {
   const doFetch = opts.fetchImpl ?? fetch;
@@ -25,17 +46,23 @@ export function createPayingFetch(opts: PayingFetchOptions) {
     const first = await doFetch(url, { ...init, headers });
     if (first.status !== 402) return first;
 
-    const challenge = (await first.clone().json()) as { priceUsd: number; asset: string };
+    const challenge = (await first.clone().json()) as PaymentChallenge;
+    const amount = parseMinor(challenge.amount);
 
     // Budget guard: abort BEFORE signing if it would breach a cap.
-    opts.budget.check(challenge.priceUsd);
+    opts.budget.check(amount);
 
-    const signature = await opts.sign(challenge);
-    headers.set(TIAGOH.PAYMENT_SIG_HEADER, signature);
+    headers.set(TIAGOH.PAYMENT_SIG_HEADER, await opts.sign(challenge));
+    // The nonce is what makes the authorization single-use on the seller's side.
+    headers.set(TIAGOH.NONCE_HEADER, challenge.nonce);
+    if (opts.signReceipt) {
+      headers.set(TIAGOH.RECEIPT_SIG_HEADER, await opts.signReceipt(challenge));
+    }
+
     const paid = await doFetch(url, { ...init, headers });
 
     // Charge-on-success: commit the spend only if the paid call actually succeeded.
-    if (paid.ok) opts.budget.charge(challenge.priceUsd);
+    if (paid.ok) opts.budget.charge(amount);
     return paid;
   };
 }

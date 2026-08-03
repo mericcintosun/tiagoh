@@ -144,19 +144,18 @@ contract PaymentChannel is ReentrancyGuard, EIP712 {
     ///         final cumulative amount (distinct from a voucher, so an interim voucher can never
     ///         be repurposed by the sender to close the channel early).
     function closeHash(uint256 channelId, uint256 cumulativeAmount) public view returns (bytes32) {
-        return _hashTypedDataV4(
-            keccak256(abi.encode(CLOSE_TYPEHASH, channelId, cumulativeAmount))
-        );
+        return _hashTypedDataV4(keccak256(abi.encode(CLOSE_TYPEHASH, channelId, cumulativeAmount)));
     }
 
     /// @notice Cooperative early close submitted by the sender: pays the recipient the final
     ///         cumulative amount they signed off on, returns the rest to the sender, and closes.
     ///         The recipient's signature guarantees they are made whole for the settled amount,
     ///         so the sender cannot short-change them.
-    function cooperativeClose(uint256 channelId, uint256 cumulativeAmount, bytes calldata recipientSig)
-        external
-        nonReentrant
-    {
+    function cooperativeClose(
+        uint256 channelId,
+        uint256 cumulativeAmount,
+        bytes calldata recipientSig
+    ) external nonReentrant {
         Channel storage ch = channels[channelId];
         if (!ch.open) revert ChannelIsClosed();
         if (msg.sender != ch.sender) revert NotSender();

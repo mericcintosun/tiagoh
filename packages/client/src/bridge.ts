@@ -1,12 +1,15 @@
 import type { BudgetGuard } from "./budget.js";
 import { listPaidTools, callPaidTool } from "./caller.js";
+import type { PaymentChallenge } from "./paying-fetch.js";
 
 export interface BridgeOptions {
   /** Base URL of the paid tiagoh gateway to bridge. */
   gatewayUrl: string;
   budget: BudgetGuard;
   /** Signs the x402 authorization for a 402 challenge. */
-  sign: (challenge: { priceUsd: number; asset: string }) => Promise<string>;
+  sign: (challenge: PaymentChallenge) => Promise<string>;
+  /** Pre-signs the receipt so paid calls made through the bridge keep their recourse. */
+  signReceipt?: (challenge: PaymentChallenge) => Promise<string>;
   payer?: string;
 }
 
@@ -44,6 +47,7 @@ export async function startStdioBridge(opts: BridgeOptions): Promise<void> {
     const { result } = await callPaidTool(opts.gatewayUrl, req.params.name, req.params.arguments ?? {}, {
       budget: opts.budget,
       sign: opts.sign,
+      signReceipt: opts.signReceipt,
       payer: opts.payer ?? "mcp-host",
     });
     return {

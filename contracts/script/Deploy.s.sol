@@ -43,19 +43,20 @@ contract Deploy is Script {
     }
 
     /// @dev Deployments are inlined into the log calls so no long-lived locals accumulate.
-    function _deployAll(address owner, address paymentToken, address rep, address ident)
-        internal
-    {
+    function _deployAll(address owner, address paymentToken, address rep, address ident) internal {
         console2.log("tiagoh contracts deployed:");
         console2.log("  ReceiptRegistry    ", address(new ReceiptRegistry(owner)));
         console2.log("  RevenueSplit       ", address(_deployRevenueSplit(paymentToken, owner)));
         console2.log("  CascadeController  ", address(new CascadeController(owner)));
-        console2.log("  PaymentChannel     ", address(new PaymentChannel(vm.envOr("CHANNEL_DEPOSIT_CAP", uint256(0)))));
+        console2.log(
+            "  PaymentChannel     ",
+            address(new PaymentChannel(vm.envOr("CHANNEL_DEPOSIT_CAP", uint256(0))))
+        );
         console2.log("  QualityBond        ", address(new QualityBond(paymentToken, owner)));
         console2.log("  EscrowVault        ", address(new EscrowVault(owner)));
-        console2.log("  DisputeArbiter     ", address(new DisputeArbiter(owner)));
+        console2.log("  DisputeArbiter     ", address(new DisputeArbiter(owner, paymentToken)));
         console2.log("  ReputationScorer   ", address(new ReputationScorer(rep, owner)));
-        console2.log("  ToolAuction        ", address(new ToolAuction(owner)));
+        console2.log("  ToolAuction        ", address(new ToolAuction(owner, paymentToken)));
         console2.log("  AgentRegistry      ", address(new AgentRegistry(ident, owner)));
     }
 

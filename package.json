@@ -17,10 +17,14 @@
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test",
     "contracts:setup": "cd contracts && bash setup-deps.sh",
-    "contracts:deploy": "bash contracts/deploy.sh"
+    "contracts:deploy": "bash contracts/deploy.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:all": "pnpm test && pnpm contracts:test"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
   }
 }

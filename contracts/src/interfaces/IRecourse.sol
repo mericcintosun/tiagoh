@@ -20,18 +20,28 @@ interface IQualityBondSlasher {
 interface IEscrowRefunder {
     function refund(uint256 escrowId) external;
 
-    /// @dev Auto-getter of EscrowVault.escrows — State is returned as its uint8 backing
-    ///      (1 = HELD), the token as its address.
-    function escrows(uint256 escrowId)
+    /// @notice Release a held escrow to the payee (a seller-favourable ruling).
+    function release(uint256 escrowId) external;
+
+    /// @notice Freeze a held escrow for the duration of a dispute, so neither party can settle
+    ///         it out from under the arbiter.
+    function freeze(uint256 escrowId) external;
+
+    /// @notice Lift a freeze without moving funds, letting the normal claim path resume.
+    function unfreeze(uint256 escrowId) external;
+
+    /// @dev Purpose-built read (NOT the packed struct's auto-getter, which would couple
+    ///      consumers to field declaration order). `state` is EscrowVault.State's uint8
+    ///      backing, where 1 = HELD.
+    function escrowParties(uint256 escrowId)
         external
         view
         returns (
             address payer,
             address payee,
-            address token,
             uint256 amount,
-            uint256 deadline,
-            bytes32 cascadeId,
-            uint8 state
+            bytes32 toolId,
+            uint8 state,
+            bool disputed
         );
 }

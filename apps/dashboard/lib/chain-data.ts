@@ -76,9 +76,20 @@ function toolHandle(toolId: string): string {
 function addrHandle(a: string): string {
   return shortHash(a, 6, 4);
 }
-/** On-chain receipt/bond/auction amounts are stored in cents (round(usd * 100)). */
-function centsToUsd(v: bigint): number {
-  return Number(v) / 100;
+/**
+ * Decimals of the payment token every on-chain amount is denominated in.
+ *
+ * This used to read the chain as if amounts were cents. They are not: bonds, escrows, auction
+ * bids and receipts are all in the payment token's minor units (6 decimals for a USDC-style
+ * token), so every figure on the dashboard was displaying 10,000x too large. Amounts are exact
+ * integers on-chain and are only converted to a float here, at the display boundary.
+ */
+const ASSET_DECIMALS = Number(process.env.NEXT_PUBLIC_ASSET_DECIMALS ?? 6);
+const ASSET_UNIT = 10 ** ASSET_DECIMALS;
+
+/** On-chain amounts are integer minor units of the payment token. Display only. */
+function minorToUsd(v: bigint): number {
+  return Number(v) / ASSET_UNIT;
 }
 /** Consistent short id so the cascade graph links child.parentId → parent.callId. */
 function shortId(hex: string): string {
@@ -113,6 +124,15 @@ const scorerAbi = [
     inputs: [{ type: "address" }],
     outputs: [{ type: "uint256" }],
   },
+  {
+    // Bond-capped per-tool score — what a buyer should actually rank by, since reputation a
+    // tool has not collateralized does not count.
+    type: "function",
+    name: "scoreOfTool",
+    stateMutability: "view",
+    inputs: [{ type: "bytes32" }],
+    outputs: [{ type: "uint256" }],
+  },
 ] as const;
 
 const auctionAbi = [
@@ -132,6 +152,8 @@ const auctionAbi = [
       { name: "settled", type: "bool" },
       { name: "winner", type: "address" },
       { name: "winningPrice", type: "uint256" },
+      { name: "serviceDeadline", type: "uint256" },
+      { name: "obligation", type: "uint8" },
     ],
   },
   { type: "function", name: "bidCount", stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "uint256" }] },
@@ -155,13 +177,14 @@ const disputeAbi = [
     stateMutability: "view",
     inputs: [{ type: "uint256" }],
     outputs: [
-      { name: "subject", type: "bytes32" },
+      { name: "receiptId", type: "bytes32" },
       { name: "buyer", type: "address" },
       { name: "seller", type: "address" },
       { name: "toolId", type: "bytes32" },
       { name: "escrowId", type: "uint256" },
       { name: "slashAmount", type: "uint256" },
-      { name: "deadline", type: "uint256" },
+      { name: "stake", type: "uint256" },
+      { name: "rulingDeadline", type: "uint64" },
       { name: "status", type: "uint8" },
       { name: "forBuyer", type: "bool" },
     ],
@@ -315,7 +338,7 @@ export function useReceipts(): Sourced<Receipt[]> {
       handle: toolHandle(r.toolId),
       callId: shortId(r.receiptId),
       parentId: r.parentId === ZERO_BYTES32 ? null : shortId(r.parentId),
-      amountUsd: centsToUsd(r.amount),
+      amountUsd: minorToUsd(r.amount),
       status: "settled",
       txHash: r.txHash,
       payer: addrHandle(r.payer),
@@ -337,7 +360,7 @@ export function useRevenue(): Sourced<RevenuePoint[]> {
       const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       const label = d.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
       const bucket = byDay.get(dayKey) ?? { date: label, revenueUsd: 0, calls: 0, sort: d.getTime() };
-      bucket.revenueUsd += centsToUsd(r.amount);
+      bucket.revenueUsd += minorToUsd(r.amount);
       bucket.calls += 1;
       byDay.set(dayKey, bucket);
     }
@@ -373,7 +396,7 @@ export function useLeaderboard(): Sourced<ReputationEntry[]> {
         const key = r.toolId.toLowerCase();
         const g = groups.get(key) ?? { toolId: r.toolId, calls: 0, volumeUsd: 0, payers: new Set<string>(), payee: r.payee };
         g.calls += 1;
-        g.volumeUsd += centsToUsd(r.amount);
+        g.volumeUsd += minorToUsd(r.amount);
         g.payers.add(r.payer.toLowerCase());
         groups.set(key, g);
       }
@@ -452,7 +475,7 @@ export function useBondFeed(): Sourced<BondEvent[]> {
           tool: toolName(l.args.toolId ?? ZERO_HASH),
           handle: toolHandle(l.args.toolId ?? ZERO_HASH),
           kind: "staked" as const,
-          amountUsd: centsToUsd(l.args.amount ?? 0n),
+          amountUsd: minorToUsd(l.args.amount ?? 0n),
           txHash: (l.transactionHash ?? ZERO_HASH) as `0x${string}`,
           ts: times.get((l.blockNumber ?? 0n).toString()) ?? Date.now(),
         })),
@@ -461,8 +484,8 @@ export function useBondFeed(): Sourced<BondEvent[]> {
           tool: toolName(l.args.toolId ?? ZERO_HASH),
           handle: toolHandle(l.args.toolId ?? ZERO_HASH),
           kind: "slashed" as const,
-          amountUsd: centsToUsd(l.args.amount ?? 0n),
-          reason: `bond slashed to buyer · ${centsToUsd(l.args.remaining ?? 0n).toFixed(2)} remaining`,
+          amountUsd: minorToUsd(l.args.amount ?? 0n),
+          reason: `bond slashed to buyer · ${minorToUsd(l.args.remaining ?? 0n).toFixed(2)} remaining`,
           txHash: (l.transactionHash ?? ZERO_HASH) as `0x${string}`,
           ts: times.get((l.blockNumber ?? 0n).toString()) ?? Date.now(),
         })),
@@ -503,10 +526,38 @@ export function useAuctions(): Sourced<Auction[]> {
           abi: auctionAbi,
           functionName: "requests",
           args: [id],
-        })) as readonly [string, string, bigint, bigint, number, boolean, boolean, string, bigint];
-        const [buyer, capabilityId, maxPrice, deadline, policy, open, settled, winner, winningPrice] = r;
+        })) as readonly [
+          string,
+          string,
+          bigint,
+          bigint,
+          number,
+          boolean,
+          boolean,
+          string,
+          bigint,
+          bigint,
+          number,
+        ];
+        const [
+          buyer,
+          capabilityId,
+          maxPrice,
+          deadline,
+          policy,
+          open,
+          settled,
+          winner,
+          winningPrice,
+          serviceDeadline,
+          obligation,
+        ] = r;
         void buyer;
         void winningPrice;
+        void serviceDeadline;
+        // Obligation enum: 1 = PENDING (winner owes delivery), 2 = DELIVERED, 3 = DEFAULTED
+        // (the winner no-showed and forfeited their bid bond to the buyer).
+        void obligation;
 
         const bidN = (await client.readContract({
           address: contracts.toolAuction,
@@ -551,7 +602,7 @@ export function useAuctions(): Sourced<Auction[]> {
           return {
             bidder: addrHandle(b.bidder),
             handle: addrHandle(b.bidder),
-            priceUsd: centsToUsd(b.price),
+            priceUsd: minorToUsd(b.price),
             reputation: scores.get(b.bidder.toLowerCase()) ?? 0,
             bondUsd: 0,
             etaMs: 0,
@@ -563,8 +614,8 @@ export function useAuctions(): Sourced<Auction[]> {
         out.push({
           id: String(id),
           capability: shortHash(capabilityId, 8, 6),
-          request: `${bids.length} signed bid${bids.length === 1 ? "" : "s"} · ceiling ${centsToUsd(maxPrice).toFixed(2)} · ${policyName}${settled ? " · settled" : ""}`,
-          budgetUsd: centsToUsd(maxPrice),
+          request: `${bids.length} signed bid${bids.length === 1 ? "" : "s"} · ceiling ${minorToUsd(maxPrice).toFixed(2)} · ${policyName}${settled ? " · settled" : ""}`,
+          budgetUsd: minorToUsd(maxPrice),
           policy: policyName,
           closesInMs: isOpen ? Math.max(0, Number(deadline) * 1000 - Date.now()) : 0,
           bids,
@@ -617,36 +668,50 @@ export function useDisputes(): Sourced<Dispute[]> {
           abi: disputeAbi,
           functionName: "disputes",
           args: [id],
-        })) as readonly [string, string, string, string, bigint, bigint, bigint, number, boolean];
-        const [subject, buyer, seller, toolId, escrowId, slashAmount, deadline, status, forBuyer] = d;
+        })) as readonly [
+          string,
+          string,
+          string,
+          string,
+          bigint,
+          bigint,
+          bigint,
+          bigint,
+          number,
+          boolean,
+        ];
+        const [receiptId, buyer, seller, toolId, escrowId, slashAmount, stake, rulingDeadline, status, forBuyer] = d;
         void buyer;
         void seller;
         void escrowId;
+        void stake;
 
-        // Status enum: 1 = OPEN, 2 = RULED.
+        // Status enum: 1 = OPEN, 2 = RULED, 3 = EXPIRED (the juror never ruled in time).
         const mapped: Dispute["status"] =
-          status === 2 ? (forBuyer ? "refunded" : "rejected") : "open";
+          status === 2 ? (forBuyer ? "refunded" : "rejected") : status === 3 ? "rejected" : "open";
 
         const openedLog = openedById.get(id.toString());
         const ruledLog = ruledById.get(id.toString());
         const openedTs = openedLog
           ? times.get((openedLog.blockNumber ?? 0n).toString()) ?? Date.now()
-          : Math.max(0, (Number(deadline) - 3 * 86_400) * 1000);
+          : Math.max(0, (Number(rulingDeadline) - 7 * 86_400) * 1000);
         const txHash = (ruledLog?.transactionHash ?? openedLog?.transactionHash ?? ZERO_HASH) as `0x${string}`;
 
         out.push({
           id: `dispute-${id}`,
-          cascadeId: shortHash(subject, 8, 6),
+          cascadeId: shortHash(receiptId, 8, 6),
           tool: toolName(toolId),
           handle: toolHandle(toolId),
           reason:
             status === 2
               ? forBuyer
                 ? "Ruled for buyer — escrow refunded and bond slashed to the buyer."
-                : "Ruled for seller — bond preserved, no refund issued."
-              : "Dispute open — awaiting on-chain ruling within the dispute window.",
-          claimUsd: centsToUsd(slashAmount),
-          bondUsd: centsToUsd(slashAmount),
+                : "Ruled for seller — bond preserved, buyer's dispute stake forfeited."
+              : status === 3
+                ? "Expired — no juror ruled in time; stake returned and the escrow unfrozen."
+                : "Dispute open — awaiting on-chain ruling within the ruling window.",
+          claimUsd: minorToUsd(slashAmount),
+          bondUsd: minorToUsd(slashAmount),
           hops: 1,
           status: mapped,
           arbiter: "on-chain juror",
@@ -691,7 +756,7 @@ function buildCascade(rows: DecodedReceipt[]): CascadeNode | null {
 
   const node = (r: DecodedReceipt, depth: number): CascadeNode => {
     const kids = (childrenOf.get(r.receiptId.toLowerCase()) ?? []).map((c) => node(c, depth + 1));
-    const amountUsd = centsToUsd(r.amount);
+    const amountUsd = minorToUsd(r.amount);
     return {
       id: r.receiptId,
       label: `${toolName(r.toolId)}()`,

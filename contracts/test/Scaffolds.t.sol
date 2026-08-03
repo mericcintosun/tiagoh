@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {SessionKeyDelegator} from "../src/SessionKeyDelegator.sol";
 import {BitVM2Arbiter} from "../src/BitVM2Arbiter.sol";
+import {DisputeHarmBinding} from "../src/DisputeHarmBinding.sol";
 import {ERC8004ReputationRegistry} from "../src/ERC8004ReputationRegistry.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
@@ -29,8 +30,13 @@ contract SessionKeyDelegatorTest is Test {
         return _sigAt(amount, nonce, _epoch());
     }
 
-    function _sigAt(uint256 amount, uint256 nonce, uint256 epoch) internal view returns (bytes memory) {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SK_PK, del.spendHash(parent, amount, nonce, epoch));
+    function _sigAt(uint256 amount, uint256 nonce, uint256 epoch)
+        internal
+        view
+        returns (bytes memory)
+    {
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(SK_PK, del.spendHash(parent, amount, nonce, epoch));
         return abi.encodePacked(r, s, v);
     }
 
@@ -149,13 +155,16 @@ contract MockBond {
     }
 }
 
-/// @dev Stateful escrow mock: exposes the `escrows` read surface (state 1 = HELD) with an
-///      amount, so harm-binding (slash <= escrow.amount) can be exercised.
+/// @dev Stateful escrow mock: exposes the `escrowParties` read surface (state 1 = HELD) with an
+///      amount, so harm-binding (slash <= escrow.amount) can be exercised, plus the freeze /
+///      unfreeze / refund writes an arbiter drives.
 contract MockEscrow {
     address public payer;
     address public payee;
     uint256 public amount;
+    bytes32 public toolId;
     uint8 public state;
+    bool public disputed;
     uint256 public refunded;
 
     function set(address payer_, address payee_, uint256 amount_, uint8 state_) external {
@@ -165,17 +174,70 @@ contract MockEscrow {
         state = state_;
     }
 
-    function escrows(uint256)
+    function setTool(bytes32 toolId_) external {
+        toolId = toolId_;
+    }
+
+    function escrowParties(uint256)
         external
         view
-        returns (address, address, address, uint256, uint256, bytes32, uint8)
+        returns (address, address, uint256, bytes32, uint8, bool)
     {
-        return (payer, payee, address(0), amount, 0, bytes32(0), state);
+        return (payer, payee, amount, toolId, state, disputed);
     }
 
     function refund(uint256 escrowId) external {
         refunded = escrowId;
         state = 3; // REFUNDED
+        disputed = false;
+    }
+
+    function release(uint256) external {
+        state = 2; // RELEASED
+        disputed = false;
+    }
+
+    function freeze(uint256) external {
+        disputed = true;
+    }
+
+    function unfreeze(uint256) external {
+        disputed = false;
+    }
+}
+
+/// @dev Receipt-evidence mock: lets the arbiter tests drive the co-signed receipt path without
+///      standing up a full registry + signatures.
+contract MockReceipts {
+    address public payer;
+    address public payee;
+    uint256 public amount;
+    bytes32 public toolId;
+    uint64 public timestamp;
+    bool public cosigned;
+
+    function set(
+        address payer_,
+        address payee_,
+        uint256 amount_,
+        bytes32 toolId_,
+        uint64 timestamp_,
+        bool cosigned_
+    ) external {
+        payer = payer_;
+        payee = payee_;
+        amount = amount_;
+        toolId = toolId_;
+        timestamp = timestamp_;
+        cosigned = cosigned_;
+    }
+
+    function receiptEvidence(bytes32)
+        external
+        view
+        returns (address, address, uint256, bytes32, uint64, bool)
+    {
+        return (payer, payee, amount, toolId, timestamp, cosigned);
     }
 }
 
@@ -198,9 +260,13 @@ contract ERC8004ReputationRegistryTest is Test {
     function test_giveFeedback_aggregatesSummary() public {
         uint256 id = reg.registerAgent(tool);
         vm.prank(payer);
-        reg.giveFeedback(id, 100, 0, "tiagoh", "success", "https://tool/mcp", "receipt:1", bytes32(uint256(1)));
+        reg.giveFeedback(
+            id, 100, 0, "tiagoh", "success", "https://tool/mcp", "receipt:1", bytes32(uint256(1))
+        );
         vm.prank(payer);
-        reg.giveFeedback(id, -100, 0, "tiagoh", "dispute", "https://tool/mcp", "receipt:2", bytes32(uint256(2)));
+        reg.giveFeedback(
+            id, -100, 0, "tiagoh", "dispute", "https://tool/mcp", "receipt:2", bytes32(uint256(2))
+        );
         (uint64 count, int256 sumWad, int256 avgWad) = reg.getSummary(id);
         assertEq(count, 2);
         assertEq(sumWad, 0); // +100 and -100 cancel, normalized to WAD
@@ -236,6 +302,7 @@ contract BitVM2ArbiterTest is Test {
     BitVM2Arbiter arb;
     MockBond bond;
     MockEscrow escrow;
+    MockReceipts receipts;
     MockVerifier verifier;
     MockERC20 stake;
 
@@ -251,13 +318,17 @@ contract BitVM2ArbiterTest is Test {
         arb = new BitVM2Arbiter(address(this), address(stake), STAKE);
         bond = new MockBond();
         escrow = new MockEscrow();
+        receipts = new MockReceipts();
         verifier = new MockVerifier();
-        arb.setRecourseTargets(address(bond), address(escrow));
+        arb.setRecourseTargets(address(bond), address(escrow), address(receipts));
         arb.setVerifier(address(verifier));
 
-        // A real held escrow (buyer -> seller) and a live bond for the tool's seller.
+        // A real held escrow (buyer -> seller), a live bond for the tool's seller, and a
+        // co-signed receipt for the same interaction.
         escrow.set(buyer, seller, 500, 1);
+        escrow.setTool(toolId);
         bond.set(seller, 500);
+        receipts.set(buyer, seller, 500, toolId, uint64(block.timestamp), true);
 
         // This contract is the proposer; fund + approve the proposal stake.
         stake.mint(address(this), 100e6);
@@ -266,42 +337,86 @@ contract BitVM2ArbiterTest is Test {
 
     function _open() internal returns (uint256 id) {
         vm.prank(buyer);
-        id = arb.openDispute(subject, buyer, seller, toolId, 7, 300);
+        id = arb.openDispute(bytes32(0), 7, 300);
     }
 
     // ── open-time validation ────────────────────────────────────────────────
 
-    function test_openDispute_notBuyer_reverts() public {
-        vm.expectRevert(BitVM2Arbiter.NotBuyer.selector);
-        arb.openDispute(subject, buyer, seller, toolId, 7, 300);
+    /// @dev The buyer is `msg.sender` by construction, so a third party cannot open a dispute
+    ///      on someone else's harm — the escrow simply isn't theirs.
+    function test_openDispute_nonFunderCannotDispute_reverts() public {
+        vm.expectRevert(DisputeHarmBinding.EscrowMismatch.selector);
+        arb.openDispute(bytes32(0), 7, 300);
     }
 
     function test_openDispute_escrowMismatch_reverts() public {
         escrow.set(address(0xDEAD), seller, 500, 1); // not the buyer's escrow
         vm.prank(buyer);
-        vm.expectRevert(BitVM2Arbiter.EscrowMismatch.selector);
-        arb.openDispute(subject, buyer, seller, toolId, 7, 300);
+        vm.expectRevert(DisputeHarmBinding.EscrowMismatch.selector);
+        arb.openDispute(bytes32(0), 7, 300);
     }
 
     function test_openDispute_slashExceedsBond_reverts() public {
         vm.prank(buyer);
-        vm.expectRevert(BitVM2Arbiter.SlashExceedsBond.selector);
-        arb.openDispute(subject, buyer, seller, toolId, 7, 600); // bond is 500
+        vm.expectRevert(DisputeHarmBinding.SlashExceedsBond.selector);
+        arb.openDispute(bytes32(0), 7, 600); // bond is 500
     }
 
-    /// @dev C1 fix: a slash can never exceed what the buyer actually escrowed for the interaction.
+    /// @dev C1 fix: a slash can never exceed the harm the buyer actually proved.
     function test_openDispute_slashExceedsHarm_reverts() public {
         escrow.set(buyer, seller, 200, 1); // only 200 escrowed
         vm.prank(buyer);
-        vm.expectRevert(BitVM2Arbiter.SlashExceedsHarm.selector);
-        arb.openDispute(subject, buyer, seller, toolId, 7, 300); // slash 300 > harm 200
+        vm.expectRevert(DisputeHarmBinding.SlashExceedsHarm.selector);
+        arb.openDispute(bytes32(0), 7, 300); // slash 300 > harm 200
     }
 
-    /// @dev C1 fix: a bare slash with no escrow (the free-bond-theft vector) is rejected.
-    function test_openDispute_slashWithoutEscrow_reverts() public {
+    /// @dev C1 fix: a bare slash backed by no evidence at all (the free-bond-theft vector).
+    function test_openDispute_withoutAnyHarm_reverts() public {
         vm.prank(buyer);
-        vm.expectRevert(BitVM2Arbiter.SlashNeedsEscrow.selector);
-        arb.openDispute(subject, buyer, seller, toolId, 0, 300); // escrowId 0
+        vm.expectRevert(DisputeHarmBinding.NoHarm.selector);
+        arb.openDispute(bytes32(0), 0, 300);
+    }
+
+    /// @dev The instant-settle path: harm proven by a co-signed receipt, no escrow involved.
+    function test_openDispute_acceptsCosignedReceiptWithoutEscrow() public {
+        vm.prank(buyer);
+        uint256 id = arb.openDispute(subject, 0, 300);
+
+        arb.propose(id, true);
+        vm.warp(block.timestamp + 2 hours);
+        arb.rule(id, true);
+
+        assertEq(escrow.refunded(), 0, "no escrow to refund");
+        assertEq(bond.slashed(), 300, "recourse came from the bond");
+        assertEq(bond.to(), buyer, "routed to the buyer");
+    }
+
+    /// @dev A unilaterally-written receipt is telemetry, not evidence.
+    function test_openDispute_rejectsUncosignedReceipt() public {
+        receipts.set(buyer, seller, 500, toolId, uint64(block.timestamp), false);
+        vm.prank(buyer);
+        vm.expectRevert(DisputeHarmBinding.ReceiptNotCosigned.selector);
+        arb.openDispute(subject, 0, 300);
+    }
+
+    function test_openDispute_receiptMustNameTheDisputer() public {
+        receipts.set(address(0xDEAD), seller, 500, toolId, uint64(block.timestamp), true);
+        vm.prank(buyer);
+        vm.expectRevert(DisputeHarmBinding.ReceiptNotBuyers.selector);
+        arb.openDispute(subject, 0, 300);
+    }
+
+    function test_openDispute_sameHarmCannotBeReLitigated() public {
+        _open();
+        vm.prank(buyer);
+        vm.expectRevert(DisputeHarmBinding.AlreadyDisputed.selector);
+        arb.openDispute(bytes32(0), 7, 300);
+    }
+
+    /// @dev Opening a dispute freezes the escrow so neither party can settle around the arbiter.
+    function test_openDispute_freezesTheEscrow() public {
+        _open();
+        assertTrue(escrow.disputed(), "frozen for the duration of the dispute");
     }
 
     // ── propose ─────────────────────────────────────────────────────────────

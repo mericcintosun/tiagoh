@@ -1,5 +1,6 @@
 import { type Address, type Hex, keccak256, toHex } from "viem";
 import { goatPublicClient, goatWalletClient } from "./clients.js";
+import { asBytes32, toolId } from "./receipts.js";
 
 const SCORER_ABI = [
   {
@@ -9,9 +10,49 @@ const SCORER_ABI = [
     inputs: [{ type: "address" }],
     outputs: [{ type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "scoreOfTool",
+    stateMutability: "view",
+    inputs: [{ type: "bytes32" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "scoreOfSeller",
+    stateMutability: "view",
+    inputs: [{ type: "address" }, { type: "bytes32" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "recordSuccess",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "toolId", type: "bytes32" },
+      { name: "seller", type: "address" },
+      { name: "volume", type: "uint256" },
+      { name: "newPayer", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "recordDispute",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "toolId", type: "bytes32" }, { name: "seller", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "recordSlash",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "toolId", type: "bytes32" }, { name: "seller", type: "address" }],
+    outputs: [],
+  },
 ] as const;
 
-/** Read a subject's on-chain reputation score (free view call). */
+/** Read an operator's on-chain reputation score (free view call). */
 export async function readScore(
   scorer: Address,
   subject: Address,
@@ -19,6 +60,100 @@ export async function readScore(
 ): Promise<bigint> {
   const pub = goatPublicClient({ rpcUrl: opts?.rpcUrl });
   return pub.readContract({ address: scorer, abi: SCORER_ABI, functionName: "scoreOf", args: [subject] });
+}
+
+/**
+ * Read a tool's bond-capped score — the number a buyer agent or the reverse auction should
+ * actually rank by. Reputation a tool has not collateralized does not count, which is what makes
+ * wash-trading and fresh-address Sybils pointless on a chain where gas is nearly free.
+ */
+export async function readToolScore(
+  scorer: Address,
+  tool: string,
+  opts?: { rpcUrl?: string },
+): Promise<bigint> {
+  const pub = goatPublicClient({ rpcUrl: opts?.rpcUrl });
+  return pub.readContract({
+    address: scorer,
+    abi: SCORER_ABI,
+    functionName: "scoreOfTool",
+    args: [toolId(tool)],
+  });
+}
+
+/**
+ * Write settlement outcomes into `ReputationScorer`. Wire this into the gateway so the score the
+ * buyer agent reads is built from real settled calls — it used to have no writer at all, which
+ * left `scoreOf` permanently zero in production while the demo ranked tools off a hardcoded
+ * table.
+ *
+ * `volume` is in the payment token's MINOR units, matching `ReputationScorer.volumeDivisor`.
+ * Reporters must only report outcomes backed by a co-signed receipt.
+ */
+export function createScoreReporter(opts: {
+  privateKey: Hex;
+  scorer: Address;
+  rpcUrl?: string;
+  priorityGasPrice?: bigint;
+  maxGasPrice?: bigint;
+}) {
+  const wallet = goatWalletClient(opts.privateKey, { rpcUrl: opts.rpcUrl });
+  const pub = goatPublicClient({ rpcUrl: opts.rpcUrl });
+  const gas = {
+    maxPriorityFeePerGas: opts.priorityGasPrice ?? 200000n,
+    maxFeePerGas: opts.maxGasPrice ?? 1000000n,
+  };
+  const seenPayers = new Set<string>();
+
+  async function send(hash: Hex): Promise<{ txHash: Hex }> {
+    await pub.waitForTransactionReceipt({ hash });
+    return { txHash: hash };
+  }
+
+  return {
+    /**
+     * @param volume settled amount in the payment token's MINOR units, matching
+     *   `ReputationScorer.volumeDivisor`. Only report outcomes backed by a co-signed receipt.
+     */
+    async recordSuccess(a: { tool: string; seller: Address; volume: bigint; payer: string }) {
+      // `newPayer` drives the unique-payer term. Tracked per process, so a restarted gateway may
+      // re-count a payer once; the bond cap bounds what that can be worth either way.
+      const key = `${a.tool}:${a.payer.toLowerCase()}`;
+      const newPayer = !seenPayers.has(key);
+      seenPayers.add(key);
+      return send(
+        await wallet.writeContract({
+          address: opts.scorer,
+          abi: SCORER_ABI,
+          functionName: "recordSuccess",
+          args: [toolId(a.tool), a.seller, a.volume, newPayer],
+          ...gas,
+        }),
+      );
+    },
+    async recordDispute(a: { tool: string; seller: Address }) {
+      return send(
+        await wallet.writeContract({
+          address: opts.scorer,
+          abi: SCORER_ABI,
+          functionName: "recordDispute",
+          args: [toolId(a.tool), a.seller],
+          ...gas,
+        }),
+      );
+    },
+    async recordSlash(a: { tool: string; seller: Address }) {
+      return send(
+        await wallet.writeContract({
+          address: opts.scorer,
+          abi: SCORER_ABI,
+          functionName: "recordSlash",
+          args: [toolId(a.tool), a.seller],
+          ...gas,
+        }),
+      );
+    },
+  };
 }
 
 // --- ERC-8004 Reputation Registry --------------------------------------------------------------
@@ -164,21 +299,28 @@ const DISPUTE_ABI = [
     name: "openDispute",
     stateMutability: "nonpayable",
     inputs: [
-      { type: "bytes32" },
-      { type: "address" },
-      { type: "address" },
-      { type: "bytes32" },
-      { type: "uint256" },
-      { type: "uint256" },
+      { name: "receiptId", type: "bytes32" },
+      { name: "escrowId", type: "uint256" },
+      { name: "slashAmount", type: "uint256" },
     ],
     outputs: [{ type: "uint256" }],
   },
 ] as const;
 
 /**
- * Open an on-chain dispute (write) against a bad paid call — a buyer-favorable ruling
- * refunds the escrow and slashes the tool's bond to the buyer. Built and ready; the
- * demos default to an off-chain dispute callback so they don't spend gas.
+ * Open an on-chain dispute against a bad paid call. A buyer-favorable ruling refunds the escrow
+ * (if there is one) and slashes the tool's bond to the buyer.
+ *
+ * The caller IS the buyer — the arbiter derives the counterparty and the tool from the evidence
+ * rather than trusting parameters. Two ways to prove harm:
+ *
+ *   - `receiptId` of a **co-signed** receipt. This is the instant-settle path: the money is
+ *     already gone, so recourse comes from the seller's bond. Passing a receipt the gateway
+ *     wrote unilaterally will revert — only a receipt both parties signed is evidence.
+ *   - `escrowId` of an escrow the caller funded and that is still held (the insured path).
+ *
+ * The slash is capped on-chain at `min(provenHarm, liveBond)`, and each piece of evidence can
+ * back exactly one dispute.
  */
 export function createOnchainDispute(opts: {
   privateKey: Hex;
@@ -190,25 +332,21 @@ export function createOnchainDispute(opts: {
   const wallet = goatWalletClient(opts.privateKey, { rpcUrl: opts.rpcUrl });
   const pub = goatPublicClient({ rpcUrl: opts.rpcUrl });
   return async (args: {
-    subject: string;
-    buyer: Address;
-    seller: Address;
-    toolId: string;
+    /** Receipt id of the disputed call (must be anchored co-signed). */
+    receiptId?: string;
+    /** Held escrow funded by the caller, if this call was escrowed. */
     escrowId?: bigint;
+    /** Bond amount to slash, in the payment token's minor units. */
     slashAmount?: bigint;
   }): Promise<{ txHash: string }> => {
+    if (!args.receiptId && !args.escrowId) {
+      throw new Error("a dispute needs provable harm: pass a co-signed receiptId and/or an escrowId");
+    }
     const hash = await wallet.writeContract({
       address: opts.arbiter,
       abi: DISPUTE_ABI,
       functionName: "openDispute",
-      args: [
-        keccak256(toHex(args.subject)),
-        args.buyer,
-        args.seller,
-        keccak256(toHex(args.toolId)),
-        args.escrowId ?? 0n,
-        args.slashAmount ?? 0n,
-      ],
+      args: [asBytes32(args.receiptId), args.escrowId ?? 0n, args.slashAmount ?? 0n],
       maxPriorityFeePerGas: opts.priorityGasPrice ?? 200000n,
       maxFeePerGas: opts.maxGasPrice ?? 1000000n,
     });

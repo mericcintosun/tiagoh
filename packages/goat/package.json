@@ -1,7 +1,7 @@
 {
   "name": "@tiagoh/goat",
   "version": "0.1.0",
-  "description": "tiagoh's GOAT Network foundation — @goatnetwork/agentkit wrapped with x402 + ERC-8004 ready to use.",
+  "description": "tiagoh's GOAT Network foundation \u2014 @goatnetwork/agentkit wrapped with x402 + ERC-8004 ready to use.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -18,7 +18,9 @@
       "require": "./dist/browser.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -27,7 +29,8 @@
   },
   "dependencies": {
     "@goatnetwork/agentkit": "^0.2.2",
-    "viem": "^2.46.3"
+    "viem": "^2.46.3",
+    "@tiagoh/core": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

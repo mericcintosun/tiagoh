@@ -46,9 +46,9 @@ contract DeployMainnet is Script {
         PaymentChannel channel = new PaymentChannel(channelCap);
         QualityBond bond = new QualityBond(address(token), deployer);
         EscrowVault escrow = new EscrowVault(deployer);
-        DisputeArbiter arbiter = new DisputeArbiter(deployer);
+        DisputeArbiter arbiter = new DisputeArbiter(deployer, address(token));
         ReputationScorer scorer = new ReputationScorer(address(0), deployer);
-        ToolAuction auction = new ToolAuction(deployer);
+        ToolAuction auction = new ToolAuction(deployer, address(token));
         AgentRegistry agents = new AgentRegistry(address(0), deployer);
 
         // 3. Trust-layer additions.
@@ -59,11 +59,18 @@ contract DeployMainnet is Script {
         BitVM2Arbiter bitvm = new BitVM2Arbiter(deployer, address(token), proposalBond);
 
         // 4. Wiring (permissioned arbiter authorized; BitVM2 intentionally NOT authorized yet).
+        //    Roles are granted explicitly: no contract treats its owner as an implicit
+        //    recorder/juror/reporter, so each capability has to be named here to exist.
         receipts.setRecorder(deployer, true);
         escrow.setArbiter(address(arbiter), true);
         bond.setArbiter(address(arbiter), true);
-        arbiter.setRecourseTargets(address(bond), address(escrow));
+        arbiter.setRecourseTargets(address(bond), address(escrow), address(receipts));
+        arbiter.setJuror(deployer, true);
         scorer.setReporter(deployer, true);
+        scorer.setQualityBond(address(bond));
+        // BitVM2 gets its recourse reads wired (harm binding is view-only) but is NOT granted
+        // `isArbiter` on bond/escrow — it cannot move value until a real verifier exists.
+        bitvm.setRecourseTargets(address(bond), address(escrow), address(receipts));
 
         // 5. Guarded-launch caps.
         escrow.setMaxEscrow(maxEscrow);
@@ -71,11 +78,24 @@ contract DeployMainnet is Script {
 
         // 6. Proof of life: anchor a genesis receipt + register an ERC-8004 agent + feedback.
         receipts.recordReceipt(
-            keccak256("tiagoh:mainnet:genesis"), bytes32(0), deployer, deployer, address(token), 100, keccak256("get_goat_market_data")
+            keccak256("tiagoh:mainnet:genesis"),
+            bytes32(0),
+            deployer,
+            deployer,
+            address(token),
+            100,
+            keccak256("get_goat_market_data")
         );
         uint256 agentId = rep.registerAgent(address(split));
         rep.giveFeedback(
-            agentId, int128(100), 0, "tiagoh", "success", "https://tiagoh.vercel.app/api/mcp", "receipt:mainnet:genesis", keccak256("tiagoh:mainnet:genesis")
+            agentId,
+            int128(100),
+            0,
+            "tiagoh",
+            "success",
+            "https://tiagoh.vercel.app/api/mcp",
+            "receipt:mainnet:genesis",
+            keccak256("tiagoh:mainnet:genesis")
         );
 
         vm.stopBroadcast();

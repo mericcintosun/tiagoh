@@ -42,6 +42,7 @@ contract EscrowHardeningTest is Test {
     address internal attacker = address(0xBAD);
     address internal seller = address(0x5E);
     bytes32 internal constant CASCADE = keccak256("cascade-1");
+    bytes32 internal constant TOOL = keccak256("tool");
 
     function setUp() public {
         escrow = new EscrowVault(owner);
@@ -50,21 +51,52 @@ contract EscrowHardeningTest is Test {
         escrow.setArbiter(arbiter, true);
     }
 
-    /// @dev M-4/Finding2 fix: a poison escrow injected into a victim cascade is skipped, not
-    ///      allowed to revert the whole atomic unwind. Legit escrows still refund.
-    function test_unwindCascade_skipsPoisonEscrow() public {
+    /// @dev M-4/Finding2, first line of defence: an outsider can no longer inject anything into
+    ///      someone else's cascade at all. The old contract let anyone tag any cascadeId, and
+    ///      because the unwind refunded each escrow to its own payer, the attacker even got
+    ///      their poison deposit back — a free way to bloat a victim's unwind.
+    function test_unwindCascade_outsiderCannotInjectPoisonEscrow() public {
         token.mint(buyer, 100e6);
         vm.prank(buyer);
         token.approve(address(escrow), type(uint256).max);
         vm.prank(buyer);
-        escrow.deposit(seller, address(token), 100e6, 1 days, CASCADE);
+        escrow.deposit(seller, address(token), 100e6, 1 days, CASCADE, TOOL);
 
         PoisonToken poison = new PoisonToken();
         poison.mint(attacker, 50e6);
         vm.prank(attacker);
         poison.approve(address(escrow), type(uint256).max);
+
         vm.prank(attacker);
-        escrow.deposit(seller, address(poison), 50e6, 1 days, CASCADE);
+        vm.expectRevert(
+            abi.encodeWithSelector(EscrowVault.NotCascadeParticipant.selector, CASCADE, attacker)
+        );
+        escrow.deposit(seller, address(poison), 50e6, 1 days, CASCADE, TOOL);
+
+        vm.prank(arbiter);
+        escrow.unwindCascade(CASCADE);
+        assertEq(token.balanceOf(buyer), 100e6, "legit escrow refunded");
+        assertEq(escrow.cascadeEscrowCount(CASCADE), 1, "poison never entered the tree");
+    }
+
+    /// @dev M-4/Finding2, second line of defence: membership stops outsiders, but a legitimate
+    ///      participant can still pick a broken token. The unwind must skip that escrow rather
+    ///      than revert, so one bad token cannot brick a whole cascade's atomic refund.
+    function test_unwindCascade_skipsPoisonEscrowFromAParticipant() public {
+        token.mint(buyer, 100e6);
+        vm.prank(buyer);
+        token.approve(address(escrow), type(uint256).max);
+        vm.prank(buyer);
+        escrow.deposit(seller, address(token), 100e6, 1 days, CASCADE, TOOL);
+
+        // The seller is a participant (they were paid inside the tree) and funds a sub-hop with
+        // a token that reverts on transfer.
+        PoisonToken poison = new PoisonToken();
+        poison.mint(seller, 50e6);
+        vm.prank(seller);
+        poison.approve(address(escrow), type(uint256).max);
+        vm.prank(seller);
+        escrow.deposit(address(0x51), address(poison), 50e6, 1 days, CASCADE, TOOL);
 
         // Unwind must NOT revert despite the poison escrow.
         vm.prank(arbiter);
@@ -82,9 +114,9 @@ contract EscrowHardeningTest is Test {
         vm.prank(buyer);
         fee.approve(address(escrow), type(uint256).max);
         vm.prank(buyer);
-        uint256 id = escrow.deposit(seller, address(fee), 100e6, 1 days, bytes32(0));
+        uint256 id = escrow.deposit(seller, address(fee), 100e6, 1 days, bytes32(0), TOOL);
 
-        (,,, uint256 amount,,,) = escrow.escrows(id);
+        (,, uint256 amount,,,) = escrow.escrowParties(id);
         assertEq(amount, 90e6, "booked the received 90, not the nominal 100");
         assertEq(fee.balanceOf(address(escrow)), 90e6, "vault holds exactly what it booked");
     }
@@ -94,7 +126,7 @@ contract EscrowHardeningTest is Test {
         vm.prank(buyer);
         token.approve(address(escrow), type(uint256).max);
         vm.prank(buyer);
-        escrow.deposit(seller, address(token), 100e6, 1 days, CASCADE);
+        escrow.deposit(seller, address(token), 100e6, 1 days, CASCADE, TOOL);
 
         vm.prank(owner);
         vm.expectRevert(EscrowVault.NotArbiter.selector);
@@ -112,11 +144,11 @@ contract EscrowHardeningTest is Test {
 
         vm.prank(buyer);
         vm.expectRevert(EscrowVault.ExceedsCap.selector);
-        escrow.deposit(seller, address(token), 100e6, 1 days, bytes32(0));
+        escrow.deposit(seller, address(token), 100e6, 1 days, bytes32(0), TOOL);
 
         // At or under the cap is fine.
         vm.prank(buyer);
-        escrow.deposit(seller, address(token), 50e6, 1 days, bytes32(0));
+        escrow.deposit(seller, address(token), 50e6, 1 days, bytes32(0), TOOL);
         assertEq(escrow.escrowCount(), 1);
     }
 }
@@ -154,14 +186,18 @@ contract Erc8004GatingTest is Test {
 
 contract ToolAuctionDedupTest is Test {
     ToolAuction internal auction;
+    MockERC20 internal token;
     uint256 internal constant BIDDER_PK = 0xB1;
     address internal bidder;
     address internal buyer = address(0xCAFE);
     bytes32 internal constant CAP = keccak256("cap");
 
     function setUp() public {
-        auction = new ToolAuction(address(this));
+        token = new MockERC20("USD", "USD", 6);
+        auction = new ToolAuction(address(this), address(token));
         bidder = vm.addr(BIDDER_PK);
+        // Bid bonds are exercised in ToolAuction.t.sol; this suite isolates signature dedup.
+        auction.setBidBond(0);
     }
 
     function _bid(uint256 requestId, uint256 price) internal view returns (bytes memory) {

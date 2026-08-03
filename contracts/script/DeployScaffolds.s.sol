@@ -46,34 +46,49 @@ contract DeployScaffolds is Script {
         return address(del);
     }
 
-    /// BitVM2 optimistic arbiter: deploy with a proposer-stake token, wire recourse to the
-    /// live bond + escrow, and open a dispute (buyer = deployer). Proposing requires a
-    /// verifier to be set (`setVerifier`) in a follow-up tx.
+    /// BitVM2 optimistic arbiter: deploy with a proposer-stake token and wire its recourse
+    /// reads to the live bond, escrow and receipt registry.
+    /// @dev No dispute is opened here, and that is deliberate. `openDispute` now requires
+    ///      real, on-chain-proven harm — a co-signed receipt the caller paid for, or a held
+    ///      escrow they funded. The old script opened a harm-less dispute (`escrowId=0`,
+    ///      `slashAmount=0`), which is precisely the shape of the C1 finding: a dispute that
+    ///      names a counterparty without proving anything against them. Exercising the flow
+    ///      now means anchoring a real co-signed receipt first (see the e2e demo).
     function _arbiter(address deployer) internal returns (address) {
-        address qualityBond = vm.envOr("QUALITY_BOND_ADDRESS", address(0xCed393a33e999C14a2E343DAA36fbEb84ce1A4E0));
-        address escrowVault = vm.envOr("ESCROW_VAULT_ADDRESS", address(0x283c174Abf7F868Cda7B038C4a45CbCa45Aa45A7));
-        address toolSubject = vm.envOr("REVENUE_SPLIT_ADDRESS", address(0x9A846F7bEAF29622579EF71D095Ae96c7345cd23));
-        address stakeToken = vm.envOr("TIAGOH_PAYMENT_TOKEN", address(0x4ca4eDFf504Bb87D95a4DEAB67507bb1201De948));
+        address qualityBond =
+            vm.envOr("QUALITY_BOND_ADDRESS", address(0xCed393a33e999C14a2E343DAA36fbEb84ce1A4E0));
+        address escrowVault =
+            vm.envOr("ESCROW_VAULT_ADDRESS", address(0x283c174Abf7F868Cda7B038C4a45CbCa45Aa45A7));
+        address receiptRegistry = vm.envOr(
+            "RECEIPT_REGISTRY_ADDRESS", address(0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA)
+        );
+        address stakeToken =
+            vm.envOr("TIAGOH_PAYMENT_TOKEN", address(0x4ca4eDFf504Bb87D95a4DEAB67507bb1201De948));
         uint256 proposalBond = vm.envOr("PROPOSAL_BOND", uint256(10e6)); // 10 units of a 6-decimal token
 
         BitVM2Arbiter arb = new BitVM2Arbiter(deployer, stakeToken, proposalBond);
-        arb.setRecourseTargets(qualityBond, escrowVault);
-        uint256 disputeId =
-            arb.openDispute(keccak256("tiagoh:receipt:onchain"), deployer, toolSubject, keccak256("tool:demo"), 0, 0);
-        disputeId; // propose/challenge/rule exercised in follow-up txs once a verifier is set
+        arb.setRecourseTargets(qualityBond, escrowVault, receiptRegistry);
         return address(arb);
     }
 
     /// ERC-8004 reputation registry: deploy Sybil-gated (allowlist authorizer), register an
     /// agent, and write real feedback from an authorized writer (the deployer/gateway).
     function _reputation(address deployer) internal returns (address) {
-        address toolSubject = vm.envOr("REVENUE_SPLIT_ADDRESS", address(0x9A846F7bEAF29622579EF71D095Ae96c7345cd23));
+        address toolSubject =
+            vm.envOr("REVENUE_SPLIT_ADDRESS", address(0x9A846F7bEAF29622579EF71D095Ae96c7345cd23));
         FeedbackAllowlist allow = new FeedbackAllowlist(deployer);
         allow.setWriter(deployer, true); // the gateway is the authorized reporter
         ERC8004ReputationRegistry rep = new ERC8004ReputationRegistry(address(allow));
         uint256 agentId = rep.registerAgent(toolSubject);
         rep.giveFeedback(
-            agentId, int128(100), 0, "tiagoh", "success", "https://tiagoh.vercel.app/api/mcp", "receipt:onchain", keccak256("tiagoh:receipt:onchain")
+            agentId,
+            int128(100),
+            0,
+            "tiagoh",
+            "success",
+            "https://tiagoh.vercel.app/api/mcp",
+            "receipt:onchain",
+            keccak256("tiagoh:receipt:onchain")
         );
         return address(rep);
     }

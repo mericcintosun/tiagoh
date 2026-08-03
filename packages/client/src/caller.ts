@@ -1,17 +1,28 @@
 import type { Receipt } from "@tiagoh/core";
-import { createPayingFetch } from "./paying-fetch.js";
+import { createPayingFetch, type PaymentChallenge } from "./paying-fetch.js";
 import type { BudgetGuard } from "./budget.js";
 
 export interface PricedTool {
   name: string;
   description?: string;
-  _meta?: { tiagoh?: { priceUsd: number; asset: string } };
+  _meta?: {
+    tiagoh?: {
+      /** Exact price in minor units — the number to pay and account off. */
+      amount: string;
+      asset: string;
+      assetDecimals: number;
+      /** Display only. */
+      priceUsd?: number;
+    };
+  };
 }
 
 export interface CallOptions {
   budget: BudgetGuard;
   /** Signs the x402 authorization for a 402 challenge. */
-  sign: (challenge: { priceUsd: number; asset: string }) => Promise<string>;
+  sign: (challenge: PaymentChallenge) => Promise<string>;
+  /** Pre-signs the receipt so the settled call yields dispute-grade evidence. */
+  signReceipt?: (challenge: PaymentChallenge) => Promise<string>;
   /** Cascade parent id for this call (the parent hop's paymentId). */
   parentId?: string | null;
   payer?: string;
@@ -19,7 +30,10 @@ export interface CallOptions {
 }
 
 /** Discover the priced tools a gateway advertises (with x402 prices in `_meta`). */
-export async function listPaidTools(baseUrl: string, fetchImpl: typeof fetch = fetch): Promise<PricedTool[]> {
+export async function listPaidTools(
+  baseUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PricedTool[]> {
   const res = await fetchImpl(`${baseUrl}/mcp/tools/list`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -40,6 +54,7 @@ export async function callPaidTool(
   const payingFetch = createPayingFetch({
     budget: opts.budget,
     sign: opts.sign,
+    signReceipt: opts.signReceipt,
     parentId: opts.parentId,
     fetchImpl: opts.fetchImpl,
   });

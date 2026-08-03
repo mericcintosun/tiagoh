@@ -32,3 +32,22 @@ interface IReceiptRegistry {
 
     function totalVolume() external view returns (uint256);
 }
+
+/// @title IReceiptEvidence
+/// @notice The read surface an arbiter uses to bind a dispute to real, mutually-attested harm.
+/// @dev    `cosigned` is the load-bearing field: a receipt written unilaterally by a gateway
+///         recorder proves nothing (the seller controls that key), so any contract that moves
+///         value on the strength of a receipt MUST require `cosigned == true`.
+interface IReceiptEvidence {
+    function receiptEvidence(bytes32 receiptId)
+        external
+        view
+        returns (
+            address payer,
+            address payee,
+            uint256 amount,
+            bytes32 toolId,
+            uint64 timestamp,
+            bool cosigned
+        );
+}

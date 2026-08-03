@@ -44,10 +44,16 @@ contract SessionKeyDelegator is EIP712 {
     error BadEpoch();
 
     event SessionGranted(
-        address indexed parent, address indexed sessionKey, uint256 cap, uint64 expiry, uint256 epoch
+        address indexed parent,
+        address indexed sessionKey,
+        uint256 cap,
+        uint64 expiry,
+        uint256 epoch
     );
     event SessionRevoked(address indexed parent, address indexed sessionKey, uint256 epoch);
-    event Spent(address indexed parent, address indexed sessionKey, uint256 amount, uint256 totalSpent);
+    event Spent(
+        address indexed parent, address indexed sessionKey, uint256 amount, uint256 totalSpent
+    );
 
     constructor() EIP712("tiagoh SessionKeyDelegator", "1") {}
 
@@ -93,10 +99,13 @@ contract SessionKeyDelegator is EIP712 {
     /// @notice Record a spend authorized by the session key's signature; reverts past cap/expiry,
     ///         on a stale epoch (post-revoke/re-grant), or a bad nonce. The session key is
     ///         recovered from the signature, so a relayer can submit it.
-    function spend(address parent, uint256 amount, uint256 nonce, uint256 epoch, bytes calldata signature)
-        external
-        returns (address sessionKey)
-    {
+    function spend(
+        address parent,
+        uint256 amount,
+        uint256 nonce,
+        uint256 epoch,
+        bytes calldata signature
+    ) external returns (address sessionKey) {
         bytes32 digest = spendHash(parent, amount, nonce, epoch);
         sessionKey = digest.recover(signature);
 

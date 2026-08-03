@@ -34,15 +34,22 @@ contract FuzzTest is Test {
     }
 
     /// @dev A single hop never spends more than the cascade budget; overspend always reverts.
-    function testFuzz_cascade_hopNeverExceedsBudget(uint96 budget, uint96 amount, address payee) public {
+    function testFuzz_cascade_hopNeverExceedsBudget(uint96 budget, uint96 amount, address payee)
+        public
+    {
         vm.assume(budget > 0 && payee != address(0) && payee != address(cascade));
         token.mint(address(this), budget);
         token.approve(address(cascade), budget);
-        uint256 id = cascade.openCascade(address(token), budget);
+        uint256 id = cascade.openCascade(address(token), budget, 1 days);
 
         if (amount > budget) {
             vm.expectRevert(
-                abi.encodeWithSelector(CascadeController.BudgetExceeded.selector, id, uint256(budget), uint256(amount))
+                abi.encodeWithSelector(
+                    CascadeController.AllowanceExceeded.selector,
+                    id,
+                    uint256(budget),
+                    uint256(amount)
+                )
             );
             cascade.payHop(id, 0, payee, amount, 0);
         } else {
@@ -67,14 +74,23 @@ contract FuzzTest is Test {
         assertLe(uint256(cap) - del.remaining(owner, sk), cap, "spent never exceeds cap");
     }
 
-    function _trySpend(address sk, address parent, uint128 amount, uint256 nonce, uint256 epoch, uint256 rem)
-        internal
-    {
+    function _trySpend(
+        address sk,
+        address parent,
+        uint128 amount,
+        uint256 nonce,
+        uint256 epoch,
+        uint256 rem
+    ) internal {
         bytes32 digest = del.spendHash(parent, amount, nonce, epoch);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, digest);
         bytes memory sig = abi.encodePacked(r, s, v);
         if (amount > rem) {
-            vm.expectRevert(abi.encodeWithSelector(SessionKeyDelegator.CapExceeded.selector, rem, uint256(amount)));
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    SessionKeyDelegator.CapExceeded.selector, rem, uint256(amount)
+                )
+            );
             del.spend(parent, amount, nonce, epoch, sig);
         } else {
             del.spend(parent, amount, nonce, epoch, sig);
@@ -134,7 +150,9 @@ contract FuzzTest is Test {
         } else {
             vm.prank(arbiter);
             bondC.slash(toolId, slashAmt, buyer);
-            assertEq(bondC.bondAmount(toolId), 500e6 - slashAmt, "bond reduced by exactly the slash");
+            assertEq(
+                bondC.bondAmount(toolId), 500e6 - slashAmt, "bond reduced by exactly the slash"
+            );
             assertEq(token.balanceOf(buyer), slashAmt, "buyer received exactly the slash");
         }
     }

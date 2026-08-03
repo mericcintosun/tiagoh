@@ -1,5 +1,6 @@
-import { keccak256, toHex, type Address, type Hex } from "viem";
+import { type Address, type Hex } from "viem";
 import { goatWalletClient, goatPublicClient } from "./clients.js";
+import { asBytes32, toolId } from "./receipts.js";
 
 const RECEIPT_REGISTRY_ABI = [
   {
@@ -19,8 +20,6 @@ const RECEIPT_REGISTRY_ABI = [
   },
 ] as const;
 
-const ZERO32 = ("0x" + "0".repeat(64)) as Hex;
-const b32 = (s: string): Hex => keccak256(toHex(s));
 
 export interface OnchainSettleOptions {
   privateKey: Hex;
@@ -60,7 +59,8 @@ export function createOnchainSettle(opts: OnchainSettleOptions) {
   return (args: {
     paymentId: string;
     tool: string;
-    amountUsd: number;
+    /** Exact minor units of the payment token — the same integer the receipt carries. */
+    amount: bigint;
     parentId: string | null;
   }): Promise<{ txHash: string; payee: Address }> => {
     const run = async (): Promise<{ txHash: string; payee: Address }> => {
@@ -70,13 +70,16 @@ export function createOnchainSettle(opts: OnchainSettleOptions) {
         abi: RECEIPT_REGISTRY_ABI,
         functionName: "recordReceipt",
         args: [
-          b32(args.paymentId),
-          args.parentId ? b32(args.parentId) : ZERO32,
+          asBytes32(args.paymentId),
+          asBytes32(args.parentId),
           payer,
           payee,
           token,
-          BigInt(Math.max(0, Math.round(args.amountUsd * 100))),
-          b32(args.tool),
+          // Minor units, straight through. The old path multiplied dollars by 100 (cents) while
+          // ReputationScorer divided by 1e6 (token units) — a four-order-of-magnitude mismatch
+          // that only exact integers end-to-end can rule out.
+          args.amount,
+          toolId(args.tool),
         ],
         nonce,
         maxPriorityFeePerGas: priority,
@@ -120,7 +123,7 @@ export interface FacilitatorOptions {
   anchor?: (a: {
     paymentId: string;
     tool: string;
-    amountUsd: number;
+    amount: bigint;
     parentId: string | null;
   }) => Promise<{ txHash: string; payee: Address }>;
 }
@@ -143,16 +146,19 @@ function decodePaymentPayload(signature: string): unknown {
   }
 }
 
-function requirements(opts: FacilitatorOptions, tool: string, amountUsd: number) {
+function requirements(opts: FacilitatorOptions, tool: string, amount: bigint, nonce?: string) {
   return {
     scheme: "exact",
     network: opts.network ?? "goat:48816",
     asset: opts.asset,
     payTo: opts.payTo,
-    // USDC-style 6-decimal minor units; adjust per the deployment's payment token.
-    maxAmountRequired: String(Math.max(0, Math.round(amountUsd * 1e6))),
+    // Already in the token's minor units — no conversion, no rounding decision here.
+    maxAmountRequired: amount.toString(),
     resource: `tool:${tool}`,
     mimeType: "application/json",
+    // Binds the authorization to the gateway's single-use challenge, so a facilitator that
+    // honours the field will not settle the same authorization against a second call.
+    ...(nonce ? { nonce } : {}),
   };
 }
 
@@ -166,11 +172,12 @@ export function createFacilitatorVerify(opts: FacilitatorOptions) {
   const doFetch = opts.fetchImpl ?? fetch;
   return async (args: {
     tool: string;
-    priceUsd: number;
+    amount: bigint;
     asset: string;
     signature: string;
     payer: string;
     parentId: string | null;
+    nonce?: string;
   }): Promise<boolean> => {
     const res = await doFetch(`${opts.facilitatorUrl.replace(/\/$/, "")}/verify`, {
       method: "POST",
@@ -181,7 +188,7 @@ export function createFacilitatorVerify(opts: FacilitatorOptions) {
       body: JSON.stringify({
         x402Version: 1,
         paymentPayload: decodePaymentPayload(args.signature),
-        paymentRequirements: requirements(opts, args.tool, args.priceUsd),
+        paymentRequirements: requirements(opts, args.tool, args.amount, args.nonce),
       }),
     });
     if (!res.ok) return false;
@@ -202,10 +209,11 @@ export function createFacilitatorSettle(opts: FacilitatorOptions) {
   return async (args: {
     paymentId: string;
     tool: string;
-    amountUsd: number;
+    amount: bigint;
     payer: string;
     parentId: string | null;
     signature: string;
+    nonce?: string;
   }): Promise<{ txHash?: string; payee: Address }> => {
     const res = await doFetch(`${opts.facilitatorUrl.replace(/\/$/, "")}/settle`, {
       method: "POST",
@@ -216,7 +224,7 @@ export function createFacilitatorSettle(opts: FacilitatorOptions) {
       body: JSON.stringify({
         x402Version: 1,
         paymentPayload: decodePaymentPayload(args.signature),
-        paymentRequirements: requirements(opts, args.tool, args.amountUsd),
+        paymentRequirements: requirements(opts, args.tool, args.amount, args.nonce),
       }),
     });
     if (!res.ok) throw new Error(`facilitator settle failed: HTTP ${res.status}`);
@@ -234,7 +242,7 @@ export function createFacilitatorSettle(opts: FacilitatorOptions) {
       const anchored = await opts.anchor({
         paymentId: args.paymentId,
         tool: args.tool,
-        amountUsd: args.amountUsd,
+        amount: args.amount,
         parentId: args.parentId,
       });
       return { txHash: txHash ?? anchored.txHash, payee: anchored.payee };
