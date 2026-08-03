@@ -5,28 +5,43 @@
   "rpcBackup": "https://rpc.ankr.com/goat_mainnet",
   "explorer": "https://explorer.goat.network",
   "deployer": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
-  "paymentToken": "0xb55822243ea12738A50De04B0AeE4f671732FFBb",
-  "note": "Guarded launch: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100. DemoToken is a labeled TEST token, not a real stablecoin. BitVM2Arbiter deployed but NOT authorized on bond/escrow until a real verifier is wired (see docs/SECURITY.md).",
+  "paymentToken": "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
+  "note": "Hardened redeployment (see docs/SECURITY.md \u00a74b). Guarded launch: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100, DisputeArbiter.disputeStake=$1, ToolAuction.bidBond=$1. DemoToken is a labeled TEST token, not a real stablecoin. BitVM2Arbiter is deployed and has its recourse reads wired, but is deliberately NOT authorized on bond/escrow until a real fraud-proof verifier exists \u2014 and a fraud proof cannot adjudicate subjective output quality in any case (see SECURITY.md \u00a75). Owner is still an EOA: transfer to a timelock + multisig before real value flows.",
   "contracts": {
-    "DemoToken": "0xb55822243ea12738A50De04B0AeE4f671732FFBb",
-    "ReceiptRegistry": "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA",
-    "RevenueSplit": "0x0193b4865a13955EF646e6532cd024028165aBC5",
-    "CascadeController": "0xCed393a33e999C14a2E343DAA36fbEb84ce1A4E0",
-    "PaymentChannel": "0x283c174Abf7F868Cda7B038C4a45CbCa45Aa45A7",
-    "QualityBond": "0x0b592E60706695Dc1E84bFda4f2ec59dc660e980",
-    "EscrowVault": "0x10d7eC7fEbCB3009e2842B35616eA1609249C695",
-    "DisputeArbiter": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
-    "ReputationScorer": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215",
-    "ToolAuction": "0x28066960D5f655f9bEbe4B13241b3731F6f04FF7",
-    "AgentRegistry": "0xF509B481c8E07F31442C61F0eF6216C10Fa7CB8a",
-    "SessionKeyDelegator": "0x1606b7eaB84248b5a48104845398D36E2860FD36",
-    "FeedbackAllowlist": "0xc0C67BE44b5A2819C270110d7E04C2bB310E98f6",
-    "ERC8004ReputationRegistry": "0x5002C61966CdA580b16D5f2B08F43FCC71857Fc7",
-    "BitVM2Arbiter": "0x6C41430855934E8d8c0A2E9F90BfEC6d5A15144d"
+    "DemoToken": "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
+    "ReceiptRegistry": "0x87c8D46366918C848012Ad048cEba32f11645042",
+    "RevenueSplit": "0x00ee1Ec92dE3724A833996DD1e10Df9d31Be7F6E",
+    "CascadeController": "0x4165bC62a07d3A49C836CD08C1951cd7a795FDBc",
+    "PaymentChannel": "0xa823412c5710F43A6e17FC9A0Ff43eae37dc750f",
+    "QualityBond": "0x5d806CDF5cE7E7e7A8f01872d8Ac917b88db3AA3",
+    "EscrowVault": "0xA27aD6a950c33558F19ED0944Cb780F208577813",
+    "DisputeArbiter": "0x5dc0dd5013aAa31ac38497fa2d8b6D709d2A5F3b",
+    "ReputationScorer": "0x3823eCd18FFEE1e8dD3F40467B0b64970bD95f5a",
+    "ToolAuction": "0x985B7620CB61c1bDa44d47d2a8fC9c89824F83AB",
+    "AgentRegistry": "0x6CD0eDed2615BEa1d116D70461A7d8315efde154",
+    "SessionKeyDelegator": "0x0325537DA2895B42B667309eC7450481A6CE2a0b",
+    "FeedbackAllowlist": "0xDDb6c412EB93A2bDB0Df88E7fE563d54B73ed587",
+    "ERC8004ReputationRegistry": "0x9E3125d4cc46165c5BE323E3E4340Fc2Be76e75a",
+    "BitVM2Arbiter": "0x5aebd55aDB15A39E43bE237b0dEC4A20352924EE"
   },
   "liveProofs": {
-    "genesisReceipt": "ReceiptRegistry.count == 1, totalVolume == 100 (get_goat_market_data)",
+    "genesisReceipt": "ReceiptRegistry.count == 2 (one RECORDER telemetry entry + one COSIGNED)",
+    "cosignedReceipt": {
+      "receiptId": "0xd20ac5c6b499b59ba3bb405cd3e58084ae658a2d02ca749cdbb883c28967669c",
+      "tx": "0x67410c673a06dca52e677306e48825a303729dc3f3184dbdf61bd024594cd4ec",
+      "note": "Anchored permissionlessly with both parties' EIP-712 signatures; isCosigned() == true, so it is dispute-grade evidence. An anchor whose signatures covered a different receiptId was rejected on-chain in the same run."
+    },
     "erc8004Feedback": "agent registered for RevenueSplit, +100 success feedback anchored",
-    "guardedCaps": "EscrowVault.maxEscrow == 50000000 (50 tUSDdemo)"
+    "guardedCaps": "EscrowVault.maxEscrow == 50000000 \u00b7 CascadeController.maxBudget == 100000000",
+    "griefingControls": "DisputeArbiter.disputeStake == 1000000 \u00b7 ToolAuction.bidBond == 1000000",
+    "sybilCap": "ReputationScorer.qualityBond wired \u00b7 bondScoreDivisor == 1e6 \u00b7 scoreOfTool(unbonded) == 0",
+    "leastPrivilege": "EscrowVault.isArbiter(BitVM2Arbiter) == false \u00b7 no implicit owner roles anywhere"
+  },
+  "previousDeployment": {
+    "note": "Pre-hardening suite, superseded. Storage layouts and signatures differ.",
+    "ReceiptRegistry": "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA",
+    "EscrowVault": "0x10d7eC7fEbCB3009e2842B35616eA1609249C695",
+    "DisputeArbiter": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
+    "ReputationScorer": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215"
   }
 }

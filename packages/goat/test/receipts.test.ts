@@ -20,7 +20,7 @@ const DOMAIN = {
   name: "tiagoh ReceiptRegistry",
   version: "1",
   chainId: 2345,
-  verifyingContract: "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA",
+  verifyingContract: "0x87c8D46366918C848012Ad048cEba32f11645042",
 } as const;
 
 const PK = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" as Hex;
@@ -31,7 +31,7 @@ const message = {
   parentId: `0x${"00".repeat(32)}`,
   payer: account.address,
   payee: "0x0000000000000000000000000000000000005e11",
-  token: "0xb55822243ea12738A50De04B0AeE4f671732FFBb",
+  token: "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
   amount: 20_000n,
   toolId: toolId("get_rwa_price"),
 } as const;
@@ -185,7 +185,7 @@ describe("receiptStruct", () => {
       status: "settled",
       createdAt: 1,
     });
-    const struct = receiptStruct(receipt, "0xb55822243ea12738A50De04B0AeE4f671732FFBb");
+    const struct = receiptStruct(receipt, "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc");
     expect(struct.amount).toBe(20_000n);
     expect(struct.toolId).toBe(toolId("get_rwa_price"));
     expect(struct.parentId).toBe(`0x${"00".repeat(32)}`);

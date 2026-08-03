@@ -26,7 +26,7 @@ const BASE = `http://localhost:${PORT}`;
  * "unavailable" instead of failing.
  */
 const SCORER = (process.env.REPUTATION_SCORER_ADDRESS ??
-  "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215") as `0x${string}`;
+  "0x3823eCd18FFEE1e8dD3F40467B0b64970bD95f5a") as `0x${string}`;
 
 const config = TiagohConfigSchema.parse({
   upstream: { command: "in-process" },

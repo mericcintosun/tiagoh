@@ -83,9 +83,9 @@ const config = TiagohConfigSchema.parse({
 // (needs PRIVATE_KEY); otherwise a local mock facilitator is used.
 const ONCHAIN = process.env.TIAGOH_ONCHAIN === "1";
 const RECEIPT_REGISTRY = (process.env.RECEIPT_REGISTRY_ADDRESS ??
-  "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA") as `0x${string}`;
+  "0x87c8D46366918C848012Ad048cEba32f11645042") as `0x${string}`;
 const TOKEN = (process.env.TIAGOH_PAYMENT_TOKEN ??
-  "0xb55822243ea12738A50De04B0AeE4f671732FFBb") as `0x${string}`;
+  "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc") as `0x${string}`;
 const EXPLORER = process.env.TIAGOH_EXPLORER ?? "https://explorer.goat.network/tx/";
 
 const onchainSettle = ONCHAIN

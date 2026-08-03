@@ -32,6 +32,10 @@ contract DeployMainnet is Script {
         uint256 maxBudget = vm.envOr("MAX_BUDGET", uint256(100e6)); // $100 guarded cap
         uint256 channelCap = vm.envOr("CHANNEL_DEPOSIT_CAP", uint256(100e6));
         uint256 proposalBond = vm.envOr("PROPOSAL_BOND", uint256(10e6));
+        // Griefing controls. Both default to 0 in the contracts (disabled, for testnet), so a
+        // launch that does not set them ships free disputes and free auction bids.
+        uint256 disputeStake = vm.envOr("DISPUTE_STAKE", uint256(1e6)); // $1 to open a dispute
+        uint256 bidBond = vm.envOr("BID_BOND", uint256(1e6)); // $1 to bid in an auction
 
         vm.startBroadcast(pk);
 
@@ -72,9 +76,12 @@ contract DeployMainnet is Script {
         // `isArbiter` on bond/escrow — it cannot move value until a real verifier exists.
         bitvm.setRecourseTargets(address(bond), address(escrow), address(receipts));
 
-        // 5. Guarded-launch caps.
+        // 5. Guarded-launch caps + griefing controls.
         escrow.setMaxEscrow(maxEscrow);
         cascade.setMaxBudget(maxBudget);
+        arbiter.setDisputeStake(disputeStake);
+        auction.setBidBond(bidBond);
+        auction.setReputationScorer(address(scorer));
 
         // 6. Proof of life: anchor a genesis receipt + register an ERC-8004 agent + feedback.
         receipts.recordReceipt(
