@@ -4,7 +4,7 @@
 
 **Get paid per call for your MCP tools. AI agents pay in x402, settled on Bitcoin through GOAT Network.**
 
-[▶ Watch the 3 min demo](https://youtu.be/TA4zJ36k0PU) · [Live demo](https://tiagoh.vercel.app) · [MCP endpoint](https://tiagoh.vercel.app/api/mcp) · [Deployments](docs/DEPLOYMENTS.md) · [x402 spec](docs/x402-mcp-spec.md)
+[▶ Watch the 3 min demo](https://youtu.be/TA4zJ36k0PU) · [Live metrics](https://tiagoh.vercel.app/metrics) · [Live demo](https://tiagoh.vercel.app) · [MCP endpoint](https://tiagoh.vercel.app/api/mcp) · [Deployments](docs/DEPLOYMENTS.md) · [x402 spec](docs/x402-mcp-spec.md)
 
 Live on GOAT Network mainnet · GOAT Network AI Builder 2026
 
@@ -41,12 +41,18 @@ not marketing. Everything settles on GOAT Network with Bitcoin finality.
 - **Live dashboard** at [tiagoh.vercel.app](https://tiagoh.vercel.app) that reads the deployed
   contracts client side, no backend.
 - **Hosted MCP endpoint** at [/api/mcp](https://tiagoh.vercel.app/api/mcp), listed in the ClawUp MCP
-  marketplace, usable by any OpenClaw or ClawUp agent.
+  marketplace, usable by any OpenClaw or ClawUp agent — nine paid tools in the $0.01–0.10 band,
+  six backed by live GOAT chain reads.
+- **Real per-call settlement on mainnet.** The suite is bound to real bridged **USDC.e**
+  (`0x3022b87a…`), the autonomous buyer runs continuously against the paid catalogue, and every
+  settled call is a genuine ERC-20 transfer plus an anchored receipt — both tagged with an
+  ERC-8021 builder code so the transactions are filterable on chain. Watch the counter at
+  [tiagoh.vercel.app/metrics](https://tiagoh.vercel.app/metrics).
 
 > The addresses in [contracts/deployments/goat-mainnet.json](contracts/deployments/goat-mainnet.json)
-> are the **pre-hardening** deployment (GOAT mainnet, chainId 2345). The second hardening pass
-> changed storage layouts and signatures, so the suite needs redeploying before those addresses
-> match the code here — see the mainnet gates in [SECURITY.md](docs/SECURITY.md).
+> are the **current USDC.e-bound deployment** (GOAT mainnet, chainId 2345, deployed 2026-08-08 from
+> this tree). Earlier DemoToken suites are recorded there under `legacySuites` and are excluded from
+> headline metrics as internal traffic.
 
 ## Features
 
@@ -116,14 +122,14 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 
 ## Honest scope
 
-- **The contracts are hardened but not audited**, and the code here is ahead of the deployed
-  addresses — the second hardening pass changed storage layouts, so the suite needs redeploying.
-  [SECURITY.md](docs/SECURITY.md) lists every finding, the residual risks, and the mainnet gates.
-- **Payment signing in the demos is a local mock.** The signature binds the challenge nonce so
-  the replay guard is exercised for real, but no money moves. Real settlement through GOAT's
-  hosted x402 facilitator is a one line swap (`createFacilitatorVerify` /
-  `createFacilitatorSettle` in `@tiagoh/goat`) once the endpoint is wired. Until then the gateway
-  will not serve priced tools unless you explicitly set `allowUnverifiedPayments`.
+- **The contracts are hardened but not audited.** The deployed USDC.e suite was built from this
+  tree; [SECURITY.md](docs/SECURITY.md) lists every finding, the residual risks, and the mainnet
+  gates. Guarded value caps stay on until an independent audit.
+- **Settlement is real; the 402 challenge signature is still the simple binding.** Money moves as
+  a genuine per-call USDC.e transfer on mainnet (`createDirectTransferSettle` — the same
+  ERC20_DIRECT model GOAT Flow uses in production), with the receipt anchored on chain. What is
+  not yet wired is GOAT Flow's hosted order lifecycle (merchant API keys); the local demo without
+  keys still requires `allowUnverifiedPayments` to be set explicitly.
 - **Judging output quality is still the open problem.** Bonds and disputes give a buyer real
   recourse, but only once something decides an output was bad. The shipped verifier catches
   objective failures (empty, errored, missing fields); it does not catch plausible-but-fabricated
@@ -131,8 +137,9 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
   truth about the world. The direction that actually shrinks the problem is making tools attest to
   their inputs and sources, so a dispute becomes a signature check rather than a judgement call.
   See [SECURITY.md §5](docs/SECURITY.md).
-- **`DemoToken` is a labeled test token**, not a stablecoin. GOAT mainnet has bridged USDC.e at
-  `0x3022b87ac063DE95b1570F46f5e470F8B53112D8`; pointing `asset` at it is a config change.
+- **The payment token is real bridged USDC.e** (`0x3022b87ac063DE95b1570F46f5e470F8B53112D8`,
+  Stargate, 6 decimals). The earlier labeled `DemoToken` deployments are retired and recorded as
+  `legacySuites`, excluded from headline metrics.
 
 ## Tech
 
