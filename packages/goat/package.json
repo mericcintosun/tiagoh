@@ -28,7 +28,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@goatnetwork/agentkit": "^0.2.2",
+    "@goatnetwork/agentkit": "^0.2.3",
     "viem": "^2.46.3",
     "@tiagoh/core": "workspace:*"
   },

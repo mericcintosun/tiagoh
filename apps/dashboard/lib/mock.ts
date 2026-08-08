@@ -567,6 +567,6 @@ export const contractGrid: ContractInfo[] = [
   { name: "AgentRegistry", purpose: "ERC-8004 identity + capped delegation", address: deployedContracts.agentRegistry, status: "live" },
   { name: "SessionKeyDelegator", purpose: "ERC-4337 session keys: capped, signed, revocable spend", address: deployedContracts.sessionKeyDelegator, status: "live" },
   { name: "BitVM2Arbiter", purpose: "Optimistic ruling — deployed, deliberately not yet authorized", address: deployedContracts.bitVM2Arbiter, status: "live" },
-  { name: "ERC8004ReputationRegistry", purpose: "ERC-8004 feedback written from settlement outcomes", address: deployedContracts.erc8004ReputationRegistry, status: "live" },
-  { name: "DemoToken", purpose: "Labeled TEST payment token — not a stablecoin", address: deployedContracts.demoToken, status: "live" },
+  { name: "ERC-8004 Reputation (canonical)", purpose: "Settlement outcomes written as feedback to the canonical 0x8004… registry", address: deployedContracts.erc8004Reputation, status: "live" },
+  { name: "USDC.e (payment token)", purpose: "Real bridged stablecoin (Stargate, 6 decimals) the suite settles in", address: deployedContracts.paymentToken, status: "live" },
 ];

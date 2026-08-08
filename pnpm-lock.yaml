@@ -246,8 +246,8 @@ importers:
   packages/goat:
     dependencies:
       '@goatnetwork/agentkit':
-        specifier: ^0.2.2
-        version: 0.2.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        specifier: ^0.2.3
+        version: 0.2.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@tiagoh/core':
         specifier: workspace:*
         version: link:../core
@@ -320,6 +320,9 @@ importers:
       '@tiagoh/goat':
         specifier: workspace:*
         version: link:../../packages/goat
+      viem:
+        specifier: ^2.55.1
+        version: 2.55.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
     devDependencies:
       tsx:
         specifier: ^4.19.2
@@ -884,8 +887,8 @@ packages:
     peerDependencies:
       viem: '>=2.0.0'
 
-  '@goatnetwork/agentkit@0.2.2':
-    resolution: {integrity: sha512-daG6fsksBMG0ectcOurPDgq+nI4SL/FfkQ0XGjpbzHrbNhxjTu6XMNfe0MCmm00szJqwsWPNNgtd86Yi5FUleA==}
+  '@goatnetwork/agentkit@0.2.3':
+    resolution: {integrity: sha512-9/hN52AsKLkUbQXT7KUS/DySGgBfVwpPUNQY4txYg21gxvTGsyevJjWgLEdH3RcsrlBd7yjLLX/AGOuwl2CKzg==}
     hasBin: true
 
   '@hono/node-server@1.19.14':
@@ -6104,7 +6107,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@goatnetwork/agentkit@0.2.2(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)':
+  '@goatnetwork/agentkit@0.2.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       commander: 12.1.0
       ethers: 6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -7359,7 +7362,7 @@ snapshots:
 
   '@scure/bip32@1.7.0':
     dependencies:
-      '@noble/curves': 1.9.1
+      '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
 
@@ -8715,6 +8718,11 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
       zod: 4.4.3
+
+  abitype@1.2.4(typescript@5.9.3)(zod@3.22.4):
+    optionalDependencies:
+      typescript: 5.9.3
+      zod: 3.22.4
 
   abitype@1.2.4(typescript@5.9.3)(zod@3.25.76):
     optionalDependencies:
@@ -10648,7 +10656,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.22.4)
+      abitype: 1.2.4(typescript@5.9.3)(zod@3.22.4)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.3
@@ -10663,7 +10671,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
+      abitype: 1.2.4(typescript@5.9.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.3
@@ -10678,7 +10686,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@5.9.3)(zod@4.4.3)
+      abitype: 1.2.4(typescript@5.9.3)(zod@4.4.3)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.3
@@ -10688,11 +10696,11 @@ snapshots:
   ox@0.6.7(typescript@5.9.3)(zod@3.25.76):
     dependencies:
       '@adraffy/ens-normalize': 1.11.1
-      '@noble/curves': 1.8.1
-      '@noble/hashes': 1.7.1
-      '@scure/bip32': 1.6.2
-      '@scure/bip39': 1.5.4
-      abitype: 1.0.8(typescript@5.9.3)(zod@3.25.76)
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
+      abitype: 1.2.4(typescript@5.9.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.3

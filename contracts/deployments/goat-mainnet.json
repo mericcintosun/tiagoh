@@ -5,43 +5,67 @@
   "rpcBackup": "https://rpc.ankr.com/goat_mainnet",
   "explorer": "https://explorer.goat.network",
   "deployer": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
-  "paymentToken": "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
-  "note": "Hardened redeployment (see docs/SECURITY.md \u00a74b). Guarded launch: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100, DisputeArbiter.disputeStake=$1, ToolAuction.bidBond=$1. DemoToken is a labeled TEST token, not a real stablecoin. BitVM2Arbiter is deployed and has its recourse reads wired, but is deliberately NOT authorized on bond/escrow until a real fraud-proof verifier exists \u2014 and a fraud proof cannot adjudicate subjective output quality in any case (see SECURITY.md \u00a75). Owner is still an EOA: transfer to a timelock + multisig before real value flows.",
+  "paymentToken": "0x3022b87ac063DE95b1570F46f5e470F8B53112D8",
+  "paymentTokenSymbol": "USDC.e",
+  "paymentTokenNote": "Real bridged stablecoin (Bridged USDC via Stargate, 6 decimals) — replaces the DemoToken used by earlier suites.",
+  "note": "USDC.e-bound redeploy (2026-07-30, DeployMainnetUSDC.s.sol), carrying over the hardened suite's role model and caps: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100, DisputeArbiter.disputeStake=$1, ToolAuction.bidBond=$1. BitVM2Arbiter is deployed with recourse reads wired but deliberately NOT authorized on bond/escrow until a real fraud-proof verifier exists (docs/SECURITY.md §5). The private ERC8004ReputationRegistry fork + FeedbackAllowlist are retired — reputation writes go to the canonical 0x8004… registries. Owner is still an EOA: transfer to a timelock + multisig before real value flows.",
   "contracts": {
-    "DemoToken": "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
-    "ReceiptRegistry": "0x87c8D46366918C848012Ad048cEba32f11645042",
-    "RevenueSplit": "0x00ee1Ec92dE3724A833996DD1e10Df9d31Be7F6E",
-    "CascadeController": "0x4165bC62a07d3A49C836CD08C1951cd7a795FDBc",
-    "PaymentChannel": "0xa823412c5710F43A6e17FC9A0Ff43eae37dc750f",
-    "QualityBond": "0x5d806CDF5cE7E7e7A8f01872d8Ac917b88db3AA3",
-    "EscrowVault": "0xA27aD6a950c33558F19ED0944Cb780F208577813",
-    "DisputeArbiter": "0x5dc0dd5013aAa31ac38497fa2d8b6D709d2A5F3b",
-    "ReputationScorer": "0x3823eCd18FFEE1e8dD3F40467B0b64970bD95f5a",
-    "ToolAuction": "0x985B7620CB61c1bDa44d47d2a8fC9c89824F83AB",
-    "AgentRegistry": "0x6CD0eDed2615BEa1d116D70461A7d8315efde154",
-    "SessionKeyDelegator": "0x0325537DA2895B42B667309eC7450481A6CE2a0b",
-    "FeedbackAllowlist": "0xDDb6c412EB93A2bDB0Df88E7fE563d54B73ed587",
-    "ERC8004ReputationRegistry": "0x9E3125d4cc46165c5BE323E3E4340Fc2Be76e75a",
-    "BitVM2Arbiter": "0x5aebd55aDB15A39E43bE237b0dEC4A20352924EE"
+    "ReceiptRegistry": "0xa5bEfC1bdc7ec16EfB0ecF8866566A9405999112",
+    "RevenueSplit": "0x2EDCd213F6A54A32079EE48B0da576ACE949f498",
+    "CascadeController": "0x3d7c7C21178F5d436004a1A44D42b8e7D0b322C8",
+    "PaymentChannel": "0x096F12309D718FC6E97e142B55feF2120647aB8B",
+    "QualityBond": "0x24Df4B7f3ECd1c5692D1e8FC91d46e119c355555",
+    "EscrowVault": "0xD6136DEc8D553D71DC5e865b89cC03b42b08BbF9",
+    "DisputeArbiter": "0x7fd534d61Baa0fB6Cc7D638A855e929B1a997291",
+    "ReputationScorer": "0x35aD6433d2e532c0938D79353F6882f68F2d36D2",
+    "ToolAuction": "0x83964A9e06661BE11DC702989FE7df4186a716Ea",
+    "AgentRegistry": "0xE8B5a5057300eD093BC363C77772f334B0a36e2c",
+    "SessionKeyDelegator": "0x307D63c900Fe15F8282f88bb8b9FF036c7Aac263",
+    "BitVM2Arbiter": "0x835E17d82c7393e974A6316Ac8BBF01B2132dB7a"
+  },
+  "canonicalErc8004": {
+    "IdentityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+    "ReputationRegistry": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+    "ValidationRegistry": "0x8004Cc8439f36fd5F9F049D9fF86523Df6dAAB58",
+    "note": "Canonical cross-chain deployments (ERC1967 proxies, live on GOAT since 2026-02-12, owner = official 8004 team key). Reputation giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32) verified identical to our retired fork's ABI via the explorer-published implementation ABI. ValidationRegistry implementation source is NOT verified on the explorer — probe before first write."
   },
   "liveProofs": {
-    "genesisReceipt": "ReceiptRegistry.count == 2 (one RECORDER telemetry entry + one COSIGNED)",
-    "cosignedReceipt": {
-      "receiptId": "0xd20ac5c6b499b59ba3bb405cd3e58084ae658a2d02ca749cdbb883c28967669c",
-      "tx": "0x67410c673a06dca52e677306e48825a303729dc3f3184dbdf61bd024594cd4ec",
-      "note": "Anchored permissionlessly with both parties' EIP-712 signatures; isCosigned() == true, so it is dispute-grade evidence. An anchor whose signatures covered a different receiptId was rejected on-chain in the same run."
-    },
-    "erc8004Feedback": "agent registered for RevenueSplit, +100 success feedback anchored",
-    "guardedCaps": "EscrowVault.maxEscrow == 50000000 \u00b7 CascadeController.maxBudget == 100000000",
-    "griefingControls": "DisputeArbiter.disputeStake == 1000000 \u00b7 ToolAuction.bidBond == 1000000",
-    "sybilCap": "ReputationScorer.qualityBond wired \u00b7 bondScoreDivisor == 1e6 \u00b7 scoreOfTool(unbonded) == 0",
-    "leastPrivilege": "EscrowVault.isArbiter(BitVM2Arbiter) == false \u00b7 no implicit owner roles anywhere"
+    "genesisReceipt": "ReceiptRegistry.count == 1 (tiagoh:mainnet:usdc:genesis, token == USDC.e)",
+    "guardedCaps": "EscrowVault.maxEscrow == 50000000 · CascadeController.maxBudget == 100000000",
+    "griefingControls": "DisputeArbiter.disputeStake == 1000000 · ToolAuction.bidBond == 1000000",
+    "leastPrivilege": "EscrowVault.isArbiter(BitVM2Arbiter) == false · no implicit owner roles anywhere"
   },
-  "previousDeployment": {
-    "note": "Pre-hardening suite, superseded. Storage layouts and signatures differ.",
-    "ReceiptRegistry": "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA",
-    "EscrowVault": "0x10d7eC7fEbCB3009e2842B35616eA1609249C695",
-    "DisputeArbiter": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
-    "ReputationScorer": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215"
+  "legacySuites": {
+    "hardened": {
+      "note": "Security-hardened suite, DemoToken-bound. Superseded by the USDC.e suite; kept for its on-chain history (cosigned receipt proof below). Counted as internal/test traffic in metrics.",
+      "DemoToken": "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
+      "ReceiptRegistry": "0x87c8D46366918C848012Ad048cEba32f11645042",
+      "RevenueSplit": "0x00ee1Ec92dE3724A833996DD1e10Df9d31Be7F6E",
+      "CascadeController": "0x4165bC62a07d3A49C836CD08C1951cd7a795FDBc",
+      "PaymentChannel": "0xa823412c5710F43A6e17FC9A0Ff43eae37dc750f",
+      "QualityBond": "0x5d806CDF5cE7E7e7A8f01872d8Ac917b88db3AA3",
+      "EscrowVault": "0xA27aD6a950c33558F19ED0944Cb780F208577813",
+      "DisputeArbiter": "0x5dc0dd5013aAa31ac38497fa2d8b6D709d2A5F3b",
+      "ReputationScorer": "0x3823eCd18FFEE1e8dD3F40467B0b64970bD95f5a",
+      "ToolAuction": "0x985B7620CB61c1bDa44d47d2a8fC9c89824F83AB",
+      "AgentRegistry": "0x6CD0eDed2615BEa1d116D70461A7d8315efde154",
+      "SessionKeyDelegator": "0x0325537DA2895B42B667309eC7450481A6CE2a0b",
+      "FeedbackAllowlist": "0xDDb6c412EB93A2bDB0Df88E7fE563d54B73ed587",
+      "ERC8004ReputationRegistryFork": "0x9E3125d4cc46165c5BE323E3E4340Fc2Be76e75a",
+      "BitVM2Arbiter": "0x5aebd55aDB15A39E43bE237b0dEC4A20352924EE",
+      "cosignedReceipt": {
+        "receiptId": "0xd20ac5c6b499b59ba3bb405cd3e58084ae658a2d02ca749cdbb883c28967669c",
+        "tx": "0x67410c673a06dca52e677306e48825a303729dc3f3184dbdf61bd024594cd4ec",
+        "note": "Anchored permissionlessly with both parties' EIP-712 signatures; isCosigned() == true."
+      }
+    },
+    "launch": {
+      "note": "Original launch suite, superseded. Storage layouts and signatures differ.",
+      "DemoToken": "0xb55822243ea12738A50De04B0AeE4f671732FFBb",
+      "ReceiptRegistry": "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA",
+      "EscrowVault": "0x10d7eC7fEbCB3009e2842B35616eA1609249C695",
+      "DisputeArbiter": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
+      "ReputationScorer": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215"
+    }
   }
 }

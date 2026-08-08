@@ -13,21 +13,34 @@ export const GOAT_MAINNET = {
 } as const;
 
 export const deployedContracts = {
-  receiptRegistry: "0x87c8D46366918C848012Ad048cEba32f11645042",
-  revenueSplit: "0x00ee1Ec92dE3724A833996DD1e10Df9d31Be7F6E",
-  cascadeController: "0x4165bC62a07d3A49C836CD08C1951cd7a795FDBc",
-  paymentChannel: "0xa823412c5710F43A6e17FC9A0Ff43eae37dc750f",
-  qualityBond: "0x5d806CDF5cE7E7e7A8f01872d8Ac917b88db3AA3",
-  escrowVault: "0xA27aD6a950c33558F19ED0944Cb780F208577813",
-  disputeArbiter: "0x5dc0dd5013aAa31ac38497fa2d8b6D709d2A5F3b",
-  reputationScorer: "0x3823eCd18FFEE1e8dD3F40467B0b64970bD95f5a",
-  toolAuction: "0x985B7620CB61c1bDa44d47d2a8fC9c89824F83AB",
-  agentRegistry: "0x6CD0eDed2615BEa1d116D70461A7d8315efde154",
-  sessionKeyDelegator: "0x0325537DA2895B42B667309eC7450481A6CE2a0b",
-  bitVM2Arbiter: "0x5aebd55aDB15A39E43bE237b0dEC4A20352924EE",
-  erc8004ReputationRegistry: "0x9E3125d4cc46165c5BE323E3E4340Fc2Be76e75a",
-  demoToken: "0xFd7315139eB2A77C7E87222F54c9711C7921f5Bc",
+  receiptRegistry: "0xa5bEfC1bdc7ec16EfB0ecF8866566A9405999112",
+  revenueSplit: "0x2EDCd213F6A54A32079EE48B0da576ACE949f498",
+  cascadeController: "0x3d7c7C21178F5d436004a1A44D42b8e7D0b322C8",
+  paymentChannel: "0x096F12309D718FC6E97e142B55feF2120647aB8B",
+  qualityBond: "0x24Df4B7f3ECd1c5692D1e8FC91d46e119c355555",
+  escrowVault: "0xD6136DEc8D553D71DC5e865b89cC03b42b08BbF9",
+  disputeArbiter: "0x7fd534d61Baa0fB6Cc7D638A855e929B1a997291",
+  reputationScorer: "0x35aD6433d2e532c0938D79353F6882f68F2d36D2",
+  toolAuction: "0x83964A9e06661BE11DC702989FE7df4186a716Ea",
+  agentRegistry: "0xE8B5a5057300eD093BC363C77772f334B0a36e2c",
+  sessionKeyDelegator: "0x307D63c900Fe15F8282f88bb8b9FF036c7Aac263",
+  bitVM2Arbiter: "0x835E17d82c7393e974A6316Ac8BBF01B2132dB7a",
+  // Canonical ERC-8004 registries (shared, not ours — same 0x8004… addresses on every mainnet).
+  erc8004Identity: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+  erc8004Reputation: "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+  erc8004Validation: "0x8004Cc8439f36fd5F9F049D9fF86523Df6dAAB58",
+  // Real bridged stablecoin the suite settles in (Stargate USDC.e, 6 decimals).
+  paymentToken: "0x3022b87ac063DE95b1570F46f5e470F8B53112D8",
 } as const satisfies Record<string, `0x${string}`>;
+
+/**
+ * Earlier mainnet suites (DemoToken-bound). Kept so historical receipts stay
+ * countable; excluded from headline metrics as internal/test traffic.
+ */
+export const legacySuites = [
+  { label: "launch (DemoToken)", receiptRegistry: "0x9a41F6d67D9082a37A16bDD971acc1659b89f1AA" },
+  { label: "hardened (DemoToken)", receiptRegistry: "0x87c8D46366918C848012Ad048cEba32f11645042" },
+] as const;
 
 /** Explorer link helpers. */
 export const addressUrl = (a: string) => `${GOAT_MAINNET.explorer}/address/${a}`;
