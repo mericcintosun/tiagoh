@@ -1,7 +1,9 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { keccak256, toHex } from "viem";
 import { checkChallenge, encodeChallenge, issueChallenge } from "@/lib/x402-paywall";
+import { settleBare, verifyPayment } from "@/lib/x402-settle";
 
 /**
  * tiagoh — paid MCP tools, served over streamable-HTTP so any MCP host (including
@@ -124,13 +126,8 @@ function withPayment<A>(
 
     // Verify against the chain before doing any work. This is also what closes replay without a
     // shared store: a spent authorization fails here, because the token records its own nonces.
-    const { createErc3009Verify, createErc3009Settle } = await import("@tiagoh/goat");
-    const verify = createErc3009Verify({
+    const result = await verifyPayment(ctx.payment, {
       token: USDCE as `0x${string}`,
-      settleTo: SETTLER as `0x${string}`,
-      rpcUrl: RPC,
-    });
-    const result = await verify(ctx.payment, {
       amount,
       nonce: checked.challenge.nonce,
       payer,
@@ -141,30 +138,15 @@ function withPayment<A>(
     // Charge-on-success: run first, settle only if it worked.
     const out = await run(args);
 
-    const settle = createErc3009Settle({
-      submitterPrivateKey: SUBMITTER_KEY as `0x${string}`,
-      token: USDCE as `0x${string}`,
-      receiptRegistry: RECEIPT_REGISTRY as `0x${string}`,
+    // The receipt id is the challenge nonce: unique per call, and already covered by the
+    // gateway's HMAC, so it needs no separate derivation.
+    await settleBare({
+      submitterKey: SUBMITTER_KEY as `0x${string}`,
       settler: SETTLER as `0x${string}`,
-      mode: "settler",
-      rpcUrl: RPC,
-    });
-    // A hosted client has no tiagoh receipt signature, so this is the `settleBare`-equivalent
-    // path: telemetry-grade receipt, but written in the same transaction as the transfer.
-    await settle({
-      receipt: {
-        paymentId: checked.challenge.nonce,
-        parentId: null,
-        tool,
-        payer,
-        payee: SELLER_PAYTO,
-        amount,
-        asset: USDCE,
-        assetDecimals: 6,
-        status: "settled",
-        createdAt: Date.now(),
-      },
-      signature: ctx.payment,
+      header: ctx.payment,
+      receiptId: checked.challenge.nonce as `0x${string}`,
+      toolId: keccak256(toHex(tool)),
+      payee: SELLER_PAYTO as `0x${string}`,
     });
     return out;
   };
