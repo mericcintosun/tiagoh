@@ -24,7 +24,7 @@ x402. Two tools are free, so an agent gets something useful before any payment q
 [`openclaw.json`](./openclaw.json) into `~/.openclaw/openclaw.json`, or run:
 
 ```bash
-openclaw mcp add tiagoh \
+openclaw mcp add tiagoh-goat-data \
   --url https://tiagoh.vercel.app/api/mcp \
   --transport streamable-http
 ```
@@ -44,5 +44,6 @@ use the two free tools but cannot buy the paid ones. That is a property of the h
 endpoint: payment travels as tool arguments (`_payer`, `_challenge`, `_payment`) as well as headers,
 so nothing but the signature is missing.
 
-A ClawUp marketplace listing is the intended distribution path (Tools → Submit MCP); this file will
-say so plainly once one exists rather than in advance.
+A ClawUp marketplace listing is the intended distribution path: `tiagoh-goat-data` is submitted and
+pending review. Once it is approved and public, an agent can attach it from **Tools → Marketplace**
+with no config at all — the server key above matches that name so both install paths agree.

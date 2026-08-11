@@ -1,10 +1,11 @@
 {
   "//": "Register tiagoh's hosted paid-MCP endpoint with an OpenClaw / ClawUp agent.",
+  "//4": "The server key matches the ClawUp marketplace name so both install paths agree.",
   "//2": "The tools are served over streamable-HTTP at tiagoh.vercel.app/api/mcp and are",
   "//3": "Merge the mcp.servers block into your OpenClaw config.",
   "mcp": {
     "servers": {
-      "tiagoh": {
+      "tiagoh-goat-data": {
         "url": "https://tiagoh.vercel.app/api/mcp",
         "transport": "streamable-http"
       }
