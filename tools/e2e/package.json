@@ -11,7 +11,8 @@
     "daemon": "tsx src/daemon.ts",
     "serve": "tsx src/serve.ts",
     "pay": "tsx src/pay.ts",
-    "pay-hosted": "tsx src/pay-hosted.ts"
+    "pay-hosted": "tsx src/pay-hosted.ts",
+    "pay-args": "tsx src/pay-args.ts"
   },
   "dependencies": {
     "@tiagoh/agent": "workspace:*",

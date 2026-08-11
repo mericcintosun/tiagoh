@@ -71,6 +71,42 @@ const PRICES_USD: Record<string, number> = {
 const minorUnits = (usd: number) => String(Math.round(usd * 1e6));
 
 /**
+ * Payment carried as tool *arguments*, not just headers.
+ *
+ * x402 puts the payment in `X-PAYMENT`, which is correct for HTTP clients — but plenty of MCP
+ * hosts give an agent no way to set a custom header (ClawUp is one), and for them a header-only
+ * paywall is an unpayable one. The same three values as tool arguments make every paid tool
+ * reachable from any MCP client, with no protocol extension and no loss of security: the payload
+ * is identical, and the challenge is still HMAC-signed and still verified against the chain.
+ *
+ * Headers win when both are present, since a host that can set them is the more deliberate path.
+ */
+const PAYMENT_ARGS = {
+  _payer: z
+    .string()
+    .optional()
+    .describe("Your GOAT address. Send this alone first to receive a price quote and challenge."),
+  _challenge: z
+    .string()
+    .optional()
+    .describe("The `challenge` string returned by the quote, echoed back verbatim."),
+  _payment: z
+    .string()
+    .optional()
+    .describe(
+      "Base64 x402 v2 `exact` payload: an ERC-3009 TransferWithAuthorization signed for `amount` " +
+        "to `settleTo`, using the challenge nonce as the authorization nonce.",
+    ),
+} as const;
+
+/** Payment fields an MCP client may pass as arguments. */
+interface PaymentArgs {
+  _payer?: string;
+  _challenge?: string;
+  _payment?: string;
+}
+
+/**
  * Gate a tool behind x402.
  *
  * MCP has no HTTP 402: the transport wraps everything in JSON-RPC, and returning a 402 status
@@ -88,8 +124,11 @@ function withPayment<A>(
     if (!PAID_MODE || priceUsd === undefined || FREE_TOOLS.has(tool)) return run(args);
 
     const ctx = requestCtx.getStore();
+    const fromArgs = (args ?? {}) as PaymentArgs;
     const amount = minorUnits(priceUsd);
-    const payer = ctx?.payer ?? "";
+    const payer = ctx?.payer ?? fromArgs._payer ?? "";
+    const payment = ctx?.payment ?? fromArgs._payment;
+    const challengeIn = ctx?.challenge ?? fromArgs._challenge;
 
     const challengeFor = (reason?: string) =>
       asText({
@@ -113,20 +152,22 @@ function withPayment<A>(
           ),
         ),
         howToPay:
-          "Sign an ERC-3009 TransferWithAuthorization for `amount` to `settleTo`, using the " +
-          "challenge nonce as the authorization nonce, then retry with the X-PAYMENT and " +
-          "X-TIAGOH-CHALLENGE headers. See https://tiagoh.vercel.app/pricing",
+          "Decode `challenge` (base64 JSON). Sign an ERC-3009 TransferWithAuthorization for its " +
+          "`amount` to its `settleTo`, using its `nonce` as the authorization nonce and " +
+          "`expiresAt`/1000 as validBefore. Call this tool again with _payer, _challenge (verbatim) " +
+          "and _payment (base64 x402 payload). Headers X-PAYMENT / X-TIAGOH-CHALLENGE work too. " +
+          "You pay no gas — the seller relays it. See https://tiagoh.vercel.app/pricing",
       });
 
-    if (!payer) return challengeFor("send X-TIAGOH-PAYER with your address to get a quote");
-    if (!ctx?.payment || !ctx.challenge) return challengeFor();
+    if (!payer) return challengeFor("call again with `_payer` set to your GOAT address for a quote");
+    if (!payment || !challengeIn) return challengeFor();
 
-    const checked = checkChallenge(ctx.challenge, { tool, amount, payer }, CHALLENGE_SECRET);
+    const checked = checkChallenge(challengeIn, { tool, amount, payer }, CHALLENGE_SECRET);
     if (!checked.ok) return challengeFor(checked.reason);
 
     // Verify against the chain before doing any work. This is also what closes replay without a
     // shared store: a spent authorization fails here, because the token records its own nonces.
-    const result = await verifyPayment(ctx.payment, {
+    const result = await verifyPayment(payment, {
       token: USDCE as `0x${string}`,
       amount,
       nonce: checked.challenge.nonce,
@@ -143,7 +184,7 @@ function withPayment<A>(
     await settleBare({
       submitterKey: SUBMITTER_KEY as `0x${string}`,
       settler: SETTLER as `0x${string}`,
-      header: ctx.payment,
+      header: payment,
       receiptId: checked.challenge.nonce as `0x${string}`,
       toolId: keccak256(toHex(tool)),
       payee: SELLER_PAYTO as `0x${string}`,
@@ -201,7 +242,7 @@ const handler = createMcpHandler(
     server.tool(
       "inspect_address",
       "Live GOAT address inspection: BTC balance, nonce, contract vs EOA. x402 price: $0.02/call.",
-      { address: z.string().describe("0x-prefixed GOAT address") },
+      { address: z.string().describe("0x-prefixed GOAT address") , ...PAYMENT_ARGS },
       withPayment("inspect_address", async ({ address }) => {
         if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new Error("pass a valid 0x address");
         const [bal, nonce, code] = await Promise.all([
@@ -223,7 +264,7 @@ const handler = createMcpHandler(
     server.tool(
       "get_token_info",
       "Live ERC-20 metadata on GOAT (name, symbol, decimals, supply). Defaults to USDC.e. x402 price: $0.02/call.",
-      { token: z.string().optional().describe("ERC-20 address, default USDC.e") },
+      { token: z.string().optional().describe("ERC-20 address, default USDC.e") , ...PAYMENT_ARGS },
       withPayment("get_token_info", async ({ token }) => {
         const t = token ?? USDCE;
         if (!/^0x[0-9a-fA-F]{40}$/.test(t)) throw new Error("pass a valid 0x token address");
@@ -243,7 +284,7 @@ const handler = createMcpHandler(
     server.tool(
       "get_tx_status",
       "Live GOAT transaction lookup: status, gas used, fee in satoshi, confirmations. x402 price: $0.02/call.",
-      { hash: z.string().describe("0x-prefixed tx hash") },
+      { hash: z.string().describe("0x-prefixed tx hash") , ...PAYMENT_ARGS },
       withPayment("get_tx_status", async ({ hash }) => {
         if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw new Error("pass a valid 0x tx hash");
         const res = await fetch(RPC, {
@@ -272,7 +313,7 @@ const handler = createMcpHandler(
     server.tool(
       "get_erc8004_registry_stats",
       "Live canonical ERC-8004 registry activity on GOAT (identity/reputation/validation tx counts). x402 price: $0.02/call.",
-      {},
+      { ...PAYMENT_ARGS },
       withPayment("get_erc8004_registry_stats", async () => {
         const reg = {
           identity: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
@@ -311,7 +352,7 @@ const handler = createMcpHandler(
     server.tool(
       "get_goat_market_data",
       "Live BTC + GOATED price and GOAT chain TVL, from CoinGecko and DefiLlama. x402 price: $0.02/call.",
-      {},
+      { ...PAYMENT_ARGS },
       withPayment("get_goat_market_data", async () => {
         const [prices, chains] = await Promise.all([
           fetch(
@@ -337,7 +378,16 @@ const handler = createMcpHandler(
       }),
     );
   },
-  {},
+  {
+    // What every MCP client and the ClawUp marketplace shows. The default from `mcp-handler`
+    // is "mcp-typescript server on vercel", which tells a user nothing about whose tools these
+    // are or what they cost.
+    serverInfo: { name: "tiagoh", version: "0.2.0" },
+    instructions:
+      "Paid GOAT Network data tools, settled per call in USDC.e over x402. `get_goat_chain_stats` " +
+      "and `get_goat_gas` are free; the rest cost $0.02 and answer an unpaid call with a signed " +
+      "payment challenge instead of data. See https://tiagoh.vercel.app/pricing.",
+  },
   { basePath: "/api", maxDuration: 60, verboseLogs: false },
 );
 
