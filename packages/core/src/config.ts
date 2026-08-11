@@ -27,8 +27,15 @@ export const TiagohConfigSchema = z.object({
     command: z.string(),
     args: z.array(z.string()).default([]),
   }),
-  /** Address (or RevenueSplit contract) that receives payment. */
+  /** The seller's identity: named as payee on every receipt, and the address that co-signs it. */
   payTo: z.string(),
+  /**
+   * `X402Settler` address. When set, the buyer's ERC-3009 authorization pays this contract, which
+   * takes the protocol fee, forwards the rest to `payTo` and anchors the co-signed receipt in one
+   * transaction. Unset, the authorization pays `payTo` directly and the receipt is anchored
+   * separately — simpler, but the payment and its evidence can then diverge.
+   */
+  settler: z.string().optional(),
   /** ERC-3009 / Permit2 payment token address. */
   asset: z.string(),
   /** Decimals of the payment token; every internal amount is an integer in these units. */

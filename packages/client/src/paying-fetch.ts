@@ -7,11 +7,17 @@ export interface PaymentChallenge {
   amount: string;
   asset: string;
   assetDecimals: number;
+  /** CAIP-2 chain id, e.g. `eip155:2345`. */
   network: string;
+  /** The seller's identity — the receipt's payee, and the party that counter-signs it. */
   payTo: string;
+  /** Where the payment authorization sends the money (the settler, or `payTo`). */
+  settleTo: string;
   tool: string;
   nonce: string;
   receiptId: string;
+  /** Cascade parent, echoed by the gateway so the buyer signs the same struct the seller does. */
+  parentId: string | null;
   expiresAt: number;
 }
 
@@ -52,7 +58,11 @@ export function createPayingFetch(opts: PayingFetchOptions) {
     // Budget guard: abort BEFORE signing if it would breach a cap.
     opts.budget.check(amount);
 
-    headers.set(TIAGOH.PAYMENT_SIG_HEADER, await opts.sign(challenge));
+    const payment = await opts.sign(challenge);
+    // Send both header names: `X-PAYMENT` is what the x402 v2 spec calls for (so a standard x402
+    // server understands us), and the tiagoh header keeps older gateways working.
+    headers.set(TIAGOH.X402_PAYMENT_HEADER, payment);
+    headers.set(TIAGOH.PAYMENT_SIG_HEADER, payment);
     // The nonce is what makes the authorization single-use on the seller's side.
     headers.set(TIAGOH.NONCE_HEADER, challenge.nonce);
     if (opts.signReceipt) {

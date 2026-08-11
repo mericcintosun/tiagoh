@@ -1,5 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { checkChallenge, encodeChallenge, issueChallenge } from "@/lib/x402-paywall";
 
 /**
  * tiagoh — paid MCP tools, served over streamable-HTTP so any MCP host (including
@@ -24,6 +26,149 @@ async function rpcCall(method: string, params: unknown[] = []): Promise<string> 
 }
 const hexDec = (h?: string) => (h ? parseInt(h, 16) : 0);
 const asText = (v: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(v) }] });
+
+// ── the paywall ──────────────────────────────────────────────────────────────
+
+/**
+ * Per-request payment context.
+ *
+ * MCP tool callbacks receive only their arguments, but x402 puts the payment in a header, so the
+ * transport wrapper stashes it here for the duration of the request. `AsyncLocalStorage` rather
+ * than a module variable, because concurrent requests on one instance would otherwise read each
+ * other's payment.
+ */
+const requestCtx = new AsyncLocalStorage<{ payment?: string; challenge?: string; payer?: string }>();
+
+const SETTLER = process.env.X402_SETTLER_ADDRESS ?? "";
+const SELLER_PAYTO = process.env.TIAGOH_PAY_TO ?? "";
+const CHALLENGE_SECRET = process.env.TIAGOH_CHALLENGE_SECRET ?? "";
+const SUBMITTER_KEY = process.env.TIAGOH_SUBMITTER_KEY ?? "";
+const RECEIPT_REGISTRY = process.env.RECEIPT_REGISTRY_ADDRESS ?? "";
+const CHAIN_ID = Number(process.env.GOAT_CHAIN_ID ?? 2345);
+
+/**
+ * Charging is off unless the deployment is fully configured to settle. A half-configured paywall
+ * that takes an authorization it cannot settle is worse than a free endpoint: the caller believes
+ * they paid.
+ */
+const PAID_MODE = Boolean(
+  SETTLER && SELLER_PAYTO && CHALLENGE_SECRET && SUBMITTER_KEY && RECEIPT_REGISTRY,
+);
+
+/** Free tier: the two cheapest chain reads stay free forever, as the hook. */
+const FREE_TOOLS = new Set(["get_goat_chain_stats", "get_goat_gas"]);
+
+const PRICES_USD: Record<string, number> = {
+  inspect_address: 0.02,
+  get_token_info: 0.02,
+  get_tx_status: 0.02,
+  get_erc8004_registry_stats: 0.02,
+  get_goat_market_data: 0.02,
+};
+
+const minorUnits = (usd: number) => String(Math.round(usd * 1e6));
+
+/**
+ * Gate a tool behind x402.
+ *
+ * MCP has no HTTP 402: the transport wraps everything in JSON-RPC, and returning a 402 status
+ * would break the client's parser rather than tell it the price. So an unpaid call succeeds at
+ * the protocol level and returns the challenge *as its result* — an agent reads `paymentRequired`,
+ * signs the authorization, and calls again with the headers. Same information, delivered in a
+ * shape MCP clients already handle.
+ */
+function withPayment<A>(
+  tool: string,
+  run: (args: A) => Promise<ReturnType<typeof asText>>,
+): (args: A) => Promise<ReturnType<typeof asText>> {
+  return async (args: A) => {
+    const priceUsd = PRICES_USD[tool];
+    if (!PAID_MODE || priceUsd === undefined || FREE_TOOLS.has(tool)) return run(args);
+
+    const ctx = requestCtx.getStore();
+    const amount = minorUnits(priceUsd);
+    const payer = ctx?.payer ?? "";
+
+    const challengeFor = (reason?: string) =>
+      asText({
+        paymentRequired: true,
+        ...(reason ? { reason } : {}),
+        x402Version: 2,
+        challenge: encodeChallenge(
+          issueChallenge(
+            {
+              tool,
+              amount,
+              asset: USDCE,
+              assetDecimals: 6,
+              network: `eip155:${CHAIN_ID}`,
+              payTo: SELLER_PAYTO,
+              settleTo: SETTLER,
+              payer,
+              parentId: null,
+            },
+            CHALLENGE_SECRET,
+          ),
+        ),
+        howToPay:
+          "Sign an ERC-3009 TransferWithAuthorization for `amount` to `settleTo`, using the " +
+          "challenge nonce as the authorization nonce, then retry with the X-PAYMENT and " +
+          "X-TIAGOH-CHALLENGE headers. See https://tiagoh.vercel.app/pricing",
+      });
+
+    if (!payer) return challengeFor("send X-TIAGOH-PAYER with your address to get a quote");
+    if (!ctx?.payment || !ctx.challenge) return challengeFor();
+
+    const checked = checkChallenge(ctx.challenge, { tool, amount, payer }, CHALLENGE_SECRET);
+    if (!checked.ok) return challengeFor(checked.reason);
+
+    // Verify against the chain before doing any work. This is also what closes replay without a
+    // shared store: a spent authorization fails here, because the token records its own nonces.
+    const { createErc3009Verify, createErc3009Settle } = await import("@tiagoh/goat");
+    const verify = createErc3009Verify({
+      token: USDCE as `0x${string}`,
+      settleTo: SETTLER as `0x${string}`,
+      rpcUrl: RPC,
+    });
+    const result = await verify(ctx.payment, {
+      amount,
+      nonce: checked.challenge.nonce,
+      payer,
+      settleTo: SETTLER,
+    });
+    if (!result.ok) return challengeFor(result.reason);
+
+    // Charge-on-success: run first, settle only if it worked.
+    const out = await run(args);
+
+    const settle = createErc3009Settle({
+      submitterPrivateKey: SUBMITTER_KEY as `0x${string}`,
+      token: USDCE as `0x${string}`,
+      receiptRegistry: RECEIPT_REGISTRY as `0x${string}`,
+      settler: SETTLER as `0x${string}`,
+      mode: "settler",
+      rpcUrl: RPC,
+    });
+    // A hosted client has no tiagoh receipt signature, so this is the `settleBare`-equivalent
+    // path: telemetry-grade receipt, but written in the same transaction as the transfer.
+    await settle({
+      receipt: {
+        paymentId: checked.challenge.nonce,
+        parentId: null,
+        tool,
+        payer,
+        payee: SELLER_PAYTO,
+        amount,
+        asset: USDCE,
+        assetDecimals: 6,
+        status: "settled",
+        createdAt: Date.now(),
+      },
+      signature: ctx.payment,
+    });
+    return out;
+  };
+}
 
 const handler = createMcpHandler(
   (server) => {
@@ -75,7 +220,7 @@ const handler = createMcpHandler(
       "inspect_address",
       "Live GOAT address inspection: BTC balance, nonce, contract vs EOA. x402 price: $0.02/call.",
       { address: z.string().describe("0x-prefixed GOAT address") },
-      async ({ address }) => {
+      withPayment("inspect_address", async ({ address }) => {
         if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new Error("pass a valid 0x address");
         const [bal, nonce, code] = await Promise.all([
           rpcCall("eth_getBalance", [address, "latest"]),
@@ -90,14 +235,14 @@ const handler = createMcpHandler(
           source: "rpc.goat.network",
           x402PriceUsd: 0.02,
         });
-      },
+      }),
     );
 
     server.tool(
       "get_token_info",
       "Live ERC-20 metadata on GOAT (name, symbol, decimals, supply). Defaults to USDC.e. x402 price: $0.02/call.",
       { token: z.string().optional().describe("ERC-20 address, default USDC.e") },
-      async ({ token }) => {
+      withPayment("get_token_info", async ({ token }) => {
         const t = token ?? USDCE;
         if (!/^0x[0-9a-fA-F]{40}$/.test(t)) throw new Error("pass a valid 0x token address");
         const call = (data: string) => rpcCall("eth_call", [{ to: t, data }, "latest"]);
@@ -110,14 +255,14 @@ const handler = createMcpHandler(
           source: "rpc.goat.network",
           x402PriceUsd: 0.02,
         });
-      },
+      }),
     );
 
     server.tool(
       "get_tx_status",
       "Live GOAT transaction lookup: status, gas used, fee in satoshi, confirmations. x402 price: $0.02/call.",
       { hash: z.string().describe("0x-prefixed tx hash") },
-      async ({ hash }) => {
+      withPayment("get_tx_status", async ({ hash }) => {
         if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw new Error("pass a valid 0x tx hash");
         const res = await fetch(RPC, {
           method: "POST",
@@ -139,14 +284,14 @@ const handler = createMcpHandler(
           source: "rpc.goat.network",
           x402PriceUsd: 0.02,
         });
-      },
+      }),
     );
 
     server.tool(
       "get_erc8004_registry_stats",
       "Live canonical ERC-8004 registry activity on GOAT (identity/reputation/validation tx counts). x402 price: $0.02/call.",
       {},
-      async () => {
+      withPayment("get_erc8004_registry_stats", async () => {
         const reg = {
           identity: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
           reputation: "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
@@ -167,67 +312,46 @@ const handler = createMcpHandler(
           }),
         );
         return asText({ registries: Object.fromEntries(rows), x402PriceUsd: 0.02 });
-      },
+      }),
     );
 
-    // ── labeled fallbacks (kept for the cascade demo) ───────────────────────
+    /*
+     * Three tools used to live here — `get_goat_market_data`, `get_rwa_price` and
+     * `get_defi_yields` — and all three returned hardcoded numbers (`btcUsd: 98342.11`,
+     * `priceUsd: 4095.83`, a fixed yield table). Harmless while the endpoint was free; the
+     * moment it is paywalled, selling fabricated data is exactly the behaviour the bond and
+     * dispute layer exists to punish, and we would be its first offender.
+     *
+     * `get_goat_market_data` is now real (below). The other two are gone rather than faked:
+     * DefiLlama lists **zero** yield pools on GOAT, and there is no free, honest feed for
+     * tokenized RWA prices. A tool with no source is not a tool.
+     */
     server.tool(
       "get_goat_market_data",
-      "BTC + GOAT market data (price, volume, TVL). x402 price: $0.01/call.",
+      "Live BTC + GOATED price and GOAT chain TVL, from CoinGecko and DefiLlama. x402 price: $0.02/call.",
       {},
-      async () => ({
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              btcUsd: 98342.11,
-              goatTvlUsd: 41_200_000,
-              source: "tiagoh:goat-defi-data",
-              x402PriceUsd: 0.01,
-              network: "goat:2345",
-            }),
+      withPayment("get_goat_market_data", async () => {
+        const [prices, chains] = await Promise.all([
+          fetch(
+            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,goat-network&vs_currencies=usd&include_24hr_change=true",
+            { headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) },
+          ).then((r) => r.json() as Promise<Record<string, Record<string, number>>>),
+          fetch("https://api.llama.fi/v2/chains", {
+            headers: { accept: "application/json" },
+            signal: AbortSignal.timeout(8000),
+          }).then((r) => r.json() as Promise<Array<Record<string, unknown>>>),
+        ]);
+        const goat = chains.find((c) => c.chainId === 2345);
+        return asText({
+          btc: { usd: prices.bitcoin?.usd ?? null, change24hPct: prices.bitcoin?.usd_24h_change ?? null },
+          goated: {
+            usd: prices["goat-network"]?.usd ?? null,
+            change24hPct: prices["goat-network"]?.usd_24h_change ?? null,
           },
-        ],
-      }),
-    );
-
-    server.tool(
-      "get_rwa_price",
-      "Tokenized real-world-asset price (gold, treasuries, etc.). x402 price: $0.02/call.",
-      { asset: z.string().optional().describe("asset symbol, e.g. gold or treasury") },
-      async ({ asset }) => ({
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              asset: asset ?? "gold",
-              priceUsd: 4095.83,
-              source: "tiagoh:goat-defi-data",
-              x402PriceUsd: 0.02,
-            }),
-          },
-        ],
-      }),
-    );
-
-    server.tool(
-      "get_defi_yields",
-      "DeFi yields across GOAT protocols. x402 price: $0.02/call.",
-      {},
-      async () => ({
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              yields: [
-                { protocol: "stBTC", apy: 6.2 },
-                { protocol: "lending", apy: 4.1 },
-              ],
-              source: "tiagoh:goat-defi-data",
-              x402PriceUsd: 0.02,
-            }),
-          },
-        ],
+          goatChainTvlUsd: (goat?.tvl as number | undefined) ?? null,
+          sources: ["api.coingecko.com", "api.llama.fi"],
+          x402PriceUsd: 0.02,
+        });
       }),
     );
   },
@@ -252,7 +376,22 @@ async function normalize(req: Request): Promise<Request> {
   return new Request(req.url, { method: req.method, headers, body });
 }
 
-const POST = async (req: Request) => handler(await normalize(req));
+/**
+ * Read the payment headers once, at the transport edge, and make them available to whichever
+ * tool the JSON-RPC body ends up dispatching to.
+ */
+const POST = async (req: Request) => {
+  const normalized = await normalize(req);
+  const h = normalized.headers;
+  return requestCtx.run(
+    {
+      payment: h.get("x-payment") ?? h.get("x-payment-signature") ?? undefined,
+      challenge: h.get("x-tiagoh-challenge") ?? undefined,
+      payer: h.get("x-tiagoh-payer") ?? undefined,
+    },
+    () => handler(normalized),
+  );
+};
 const DELETE = POST;
 
 const GET = () =>
@@ -260,7 +399,7 @@ const GET = () =>
     JSON.stringify({
       name: "tiagoh",
       description:
-        "Paid GOAT data tools in the $0.01–0.10 band (x402): live chain stats, gas, address/tx/token inspection, ERC-8004 registry activity, plus market/RWA/yield data.",
+        "Paid GOAT data tools in the $0.01–0.02 band (x402): live chain stats, gas, address/tx/token inspection, ERC-8004 registry activity, and BTC/GOATED market data. Every tool reads a live source at call time.",
       transport: "streamable-http",
       endpoint: "/api/mcp",
       tools: [
@@ -271,8 +410,6 @@ const GET = () =>
         "get_tx_status",
         "get_erc8004_registry_stats",
         "get_goat_market_data",
-        "get_rwa_price",
-        "get_defi_yields",
       ],
     }),
     { status: 200, headers: { "content-type": "application/json" } },

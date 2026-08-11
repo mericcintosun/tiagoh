@@ -40,7 +40,8 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "viem": "^2.46.3",
-    "wagmi": "^2.14.6"
+    "wagmi": "^2.14.6",
+    "@tiagoh/goat": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.17.10",

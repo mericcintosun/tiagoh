@@ -15,6 +15,7 @@ export * from "./runtime.js";
 export * from "./receipts.js";
 export * from "./settle.js";
 export * from "./direct-settle.js";
+export * from "./erc3009.js";
 export * from "./canonical8004.js";
 export * from "./reputation.js";
 export * from "./revenue.js";

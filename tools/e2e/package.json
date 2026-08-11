@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Runnable end-to-end x402 demo: gateway ↔ paying client, charge-on-success, cascade, budget enforcement.",
+  "description": "Runnable end-to-end x402 demo: gateway \u2194 paying client, charge-on-success, cascade, budget enforcement.",
   "scripts": {
     "demo": "tsx src/demo.ts",
     "agent": "tsx src/agent.ts",
     "typecheck": "tsc --noEmit",
-    "daemon": "tsx src/daemon.ts"
+    "daemon": "tsx src/daemon.ts",
+    "serve": "tsx src/serve.ts",
+    "pay": "tsx src/pay.ts",
+    "pay-hosted": "tsx src/pay-hosted.ts"
   },
   "dependencies": {
     "@tiagoh/agent": "workspace:*",

@@ -2,7 +2,7 @@
 
 # tiagoh
 
-**Get paid per call for your MCP tools. AI agents pay in x402, settled on Bitcoin through GOAT Network.**
+**Get paid per call for your MCP tools. AI agents pay in x402, settled on GOAT Network.**
 
 [▶ Watch the 3 min demo](https://youtu.be/TA4zJ36k0PU) · [Live metrics](https://tiagoh.vercel.app/metrics) · [Live demo](https://tiagoh.vercel.app) · [MCP endpoint](https://tiagoh.vercel.app/api/mcp) · [Deployments](docs/DEPLOYMENTS.md) · [x402 spec](docs/x402-mcp-spec.md)
 
@@ -22,14 +22,14 @@ Put a paywall in front of any MCP server with one command. Agents pay per tool c
 paid tool buys from other paid tools, the payments form a tree with a single budget cap and revenue
 that flows up the chain. Every tool can stake a bond that gets slashed for bad output. Broken calls
 get disputed and refunded. Tools compete in reverse auctions. Reputation is built from real receipts,
-not marketing. Everything settles on GOAT Network with Bitcoin finality.
+not marketing. Everything settles on GOAT Network, a Bitcoin L2.
 
 ## What is live right now
 
-- **16 Solidity contracts** (Foundry), covering settlement, escrow, disputes, bonds, reputation,
+- **17 Solidity contracts** (Foundry), covering settlement, escrow, disputes, bonds, reputation,
   auctions, cascades, payment channels, an ERC-4337 session-key allowance ledger, a BitVM2
-  optimistic arbiter and an ERC-8004 reputation registry. **160 of 160 contract tests passing**
-  (unit, fuzz, invariant) plus **71 TypeScript tests**. See [SECURITY.md](docs/SECURITY.md) for
+  optimistic arbiter and an ERC-8004 reputation registry. **209 of 209 contract tests passing**
+  (unit, fuzz, invariant) plus **105 TypeScript tests**. See [SECURITY.md](docs/SECURITY.md) for
   the threat model and the two hardening passes.
 - **End to end x402 flow**: the gateway answers 402 with a single-use challenge, the client pays
   under budget and pre-signs the receipt, the tool runs, only a successful call is billed, and the
@@ -43,11 +43,19 @@ not marketing. Everything settles on GOAT Network with Bitcoin finality.
 - **Hosted MCP endpoint** at [/api/mcp](https://tiagoh.vercel.app/api/mcp), listed in the ClawUp MCP
   marketplace, usable by any OpenClaw or ClawUp agent — nine paid tools in the $0.01–0.10 band,
   six backed by live GOAT chain reads.
-- **Real per-call settlement on mainnet.** The suite is bound to real bridged **USDC.e**
-  (`0x3022b87a…`), the autonomous buyer runs continuously against the paid catalogue, and every
-  settled call is a genuine ERC-20 transfer plus an anchored receipt — both tagged with an
-  ERC-8021 builder code so the transactions are filterable on chain. Watch the counter at
-  [tiagoh.vercel.app/metrics](https://tiagoh.vercel.app/metrics).
+- **Anyone can pay, with no gas and no account.** GOAT's bridged **USDC.e** is a real Circle
+  FiatTokenV2, so tiagoh runs the canonical x402 v2 `exact` scheme natively: the buyer signs an
+  ERC-3009 authorization, the gateway verifies it against the chain before doing any work, and
+  whoever relays pays the (near-zero) gas. **A wallet holding nothing but USDC.e and zero BTC can
+  buy tool calls.** No facilitator, no merchant account, no bridging gas first.
+- **Payment, protocol fee and evidence in one transaction.**
+  [`X402Settler`](contracts/src/X402Settler.sol) (`0x630b7C9D…`) pulls the authorization, takes
+  the fee, pays the seller and anchors the **co-signed** receipt atomically. If either signature
+  is bad the whole thing reverts — so a settled payment always leaves behind evidence a buyer can
+  dispute against. Fee ships at 0%, hard-capped at 5% in the contract.
+- **Real per-call settlement on mainnet**, bound to real bridged **USDC.e** (`0x3022b87a…`), with
+  every transaction tagged with an ERC-8021 builder code so it is filterable on chain by anyone.
+  Watch the counter at [tiagoh.vercel.app/metrics](https://tiagoh.vercel.app/metrics).
 
 > The addresses in [contracts/deployments/goat-mainnet.json](contracts/deployments/goat-mainnet.json)
 > are the **current USDC.e-bound deployment** (GOAT mainnet, chainId 2345, deployed 2026-08-08 from
@@ -82,9 +90,17 @@ TIAGOH_ONCHAIN=1 PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e demo
 # Autonomous buyer: discover, read reputation, pay, verify, dispute bad output
 pnpm --filter @tiagoh/e2e agent
 
+# Two processes, real money: a buyer that holds no gas pays a gateway it does not run.
+# The gateway process cannot obtain the buyer's key — that separation is the point.
+#   terminal A (seller):
+TIAGOH_SELLER_KEY=0x… PRIVATE_KEY=0x… X402_SETTLER_ADDRESS=0x630b7C9D… \
+  pnpm --filter @tiagoh/e2e serve
+#   terminal B (buyer — this wallet needs USDC.e and NO BTC):
+BUYER_PRIVATE_KEY=0x… pnpm --filter @tiagoh/e2e pay -- --url http://localhost:4402
+
 # Everything: TypeScript unit tests + contracts (unit + fuzz + invariant)
-pnpm test                                      # 71/71
-pnpm contracts:setup && pnpm contracts:test    # 160/160
+pnpm test                                      # 105/105
+pnpm contracts:setup && pnpm contracts:test    # 209/209
 ```
 
 Full reviewer path: [docs/testing-playbook.md](docs/testing-playbook.md).
@@ -109,7 +125,7 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 | `packages/agent` | autonomous buyer: reads reputation, verifies output, disputes |
 | `packages/goat` | GOAT foundation: x402 and ERC-8004 (AgentKit), viem clients, on chain settle |
 | `packages/cli` | `tiagoh` CLI: init, wrap, connect, call |
-| `contracts` | Solidity (Foundry): the 15 contracts, tests, deploy scripts |
+| `contracts` | Solidity (Foundry): the 17 contracts, tests, deploy scripts |
 | `apps/dashboard` | Next.js dashboard, reads chain client side |
 | `tools/e2e` | runnable end to end demo |
 
@@ -122,14 +138,14 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 
 ## Honest scope
 
-- **The contracts are hardened but not audited.** The deployed USDC.e suite was built from this
-  tree; [SECURITY.md](docs/SECURITY.md) lists every finding, the residual risks, and the mainnet
-  gates. Guarded value caps stay on until an independent audit.
-- **Settlement is real; the 402 challenge signature is still the simple binding.** Money moves as
-  a genuine per-call USDC.e transfer on mainnet (`createDirectTransferSettle` — the same
-  ERC20_DIRECT model GOAT Flow uses in production), with the receipt anchored on chain. What is
-  not yet wired is GOAT Flow's hosted order lifecycle (merchant API keys); the local demo without
-  keys still requires `allowUnverifiedPayments` to be set explicitly.
+- **The contracts are hardened and statically analysed, but not independently audited.** Slither
+  reports zero high-severity findings and Aderyn zero findings in the settler;
+  [SECURITY.md](docs/SECURITY.md) lists every finding, the residual risks, and the mainnet gates.
+  Guarded value caps stay on until a real audit — `X402Settler` is capped at $5 per settlement.
+- **The owner is still an EOA.** Move it to a timelock + multisig before real value flows; the
+  caps are what bound the exposure until then.
+- **Traffic so far is our own, and we label it as such.** The counter on `/metrics` publishes the
+  wallets it excludes. A loop we run proves the loop works; it does not prove demand.
 - **Judging output quality is still the open problem.** Bonds and disputes give a buyer real
   recourse, but only once something decides an output was bad. The shipped verifier catches
   objective failures (empty, errored, missing fields); it does not catch plausible-but-fabricated
@@ -144,4 +160,4 @@ MCP host or agent  ──call──▶  tiagoh gateway  ──402, pay, run─�
 ## Tech
 
 TypeScript, Node 20, pnpm workspaces. Next.js 15 and shadcn/ui. `@modelcontextprotocol/sdk`. x402
-with ERC-3009. Solidity with Foundry. ERC-8004. GOAT Network mainnet. Claude Opus 4.8 for the buyer.
+with ERC-3009 (canonical `exact` scheme). Solidity with Foundry. ERC-8004. GOAT Network mainnet. Claude Opus 4.8 for the buyer.

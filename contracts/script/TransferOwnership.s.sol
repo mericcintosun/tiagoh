@@ -18,7 +18,10 @@ contract TransferOwnership is Script {
         address gov = vm.envAddress("GOVERNANCE");
         require(gov != address(0), "GOVERNANCE unset");
 
-        address[9] memory targets = [
+        // X402Settler first: it is the only one that touches money on every single call, so if
+        // the run is interrupted it is the one that should already be under governance.
+        address[11] memory targets = [
+            vm.envOr("X402_SETTLER_ADDRESS", address(0)),
             vm.envOr("RECEIPT_REGISTRY_ADDRESS", address(0)),
             vm.envOr("REVENUE_SPLIT_ADDRESS", address(0)),
             vm.envOr("CASCADE_CONTROLLER_ADDRESS", address(0)),
@@ -27,7 +30,8 @@ contract TransferOwnership is Script {
             vm.envOr("DISPUTE_ARBITER_ADDRESS", address(0)),
             vm.envOr("REPUTATION_SCORER_ADDRESS", address(0)),
             vm.envOr("TOOL_AUCTION_ADDRESS", address(0)),
-            vm.envOr("AGENT_REGISTRY_ADDRESS", address(0))
+            vm.envOr("AGENT_REGISTRY_ADDRESS", address(0)),
+            vm.envOr("BITVM2_ARBITER_ADDRESS", address(0))
         ];
 
         vm.startBroadcast();

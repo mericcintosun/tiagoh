@@ -15,6 +15,8 @@ const ROUTES = [
   { label: "Playground", href: "/playground" },
   { label: "Auction", href: "/auction" },
   { label: "Disputes", href: "/disputes" },
+  { label: "Metrics", href: "/metrics" },
+  { label: "Pricing", href: "/pricing" },
 ];
 
 /** App-shell header — route nav + live chain badge + theme toggle. */

@@ -7,6 +7,12 @@ export const TIAGOH = {
   /** Header that carries the x402 payment signature on retry. */
   PAYMENT_SIG_HEADER: "x-payment-signature",
   /**
+   * The header the x402 v2 spec names for the same thing. Both are accepted, so a standard x402
+   * client can pay a tiagoh gateway without knowing anything about tiagoh, and existing tiagoh
+   * clients keep working. The value is the base64 `exact`-scheme payment payload.
+   */
+  X402_PAYMENT_HEADER: "x-payment",
+  /**
    * Header echoing the challenge nonce back on the paid retry. This is what makes a payment
    * single-use: the gateway issued the nonce and will accept exactly one settled call against
    * it. Without it the same authorization could be replayed to extract unlimited tool

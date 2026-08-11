@@ -110,6 +110,13 @@ export function createReceiptSigner(opts: ReceiptSignerOptions) {
  * Buyer-side signer for `createPayingFetch`'s `signReceipt` hook. The 402 challenge carries the
  * deterministic `receiptId`, which is exactly why it is deterministic: the buyer has to be able
  * to sign the bill before the seller does the work.
+ *
+ * `parentId` comes from the challenge and must not be assumed to be zero. It used to be
+ * hardcoded, which meant that on any cascade hop the buyer signed a struct claiming no parent
+ * while the seller counter-signed one carrying the real parent. The two signatures covered
+ * different messages, so `anchorReceipt` rejected them and **no hop in a cascade could ever
+ * produce dispute-grade evidence** — silently, because the gateway treats a co-signing failure
+ * as non-fatal.
  */
 export function createChallengeReceiptSigner(
   opts: ReceiptSignerOptions & { payer: Address; token: Address },
@@ -120,10 +127,11 @@ export function createChallengeReceiptSigner(
     payTo: string;
     tool: string;
     amount: string;
+    parentId?: string | null;
   }): Promise<Hex> =>
     signer.sign({
       receiptId: asBytes32(challenge.receiptId),
-      parentId: ZERO32,
+      parentId: challenge.parentId ? asBytes32(challenge.parentId) : ZERO32,
       payer: opts.payer,
       payee: challenge.payTo as Address,
       token: opts.token,

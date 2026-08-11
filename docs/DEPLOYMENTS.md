@@ -1,6 +1,128 @@
 # tiagoh — Deployments
 
-## GOAT Testnet3 (chainId 48816)
+## GOAT mainnet (chainId 2345) — the live suite
+
+- **RPC:** `https://rpc.goat.network` · **Explorer:** https://explorer.goat.network
+- **Deployer / submitter:** [`0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516`](https://explorer.goat.network/address/0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516)
+- **Payment token:** [`0x3022b87ac063DE95b1570F46f5e470F8B53112D8`](https://explorer.goat.network/address/0x3022b87ac063DE95b1570F46f5e470F8B53112D8)
+  — real bridged **USDC.e** (Stargate), 6 decimals, and a genuine Circle **FiatTokenV2**:
+  `transferWithAuthorization` / `receiveWithAuthorization` / `cancelAuthorization` / `permit` all
+  present, EIP-712 domain `{name: "Bridged USDC (Stargate)", version: "2", chainId: 2345}`
+  (verified against the token's own `DOMAIN_SEPARATOR`). This is why the canonical x402 `exact`
+  scheme works here with no external facilitator.
+
+The full structured record, including the retired DemoToken suites, is in
+[`contracts/deployments/goat-mainnet.json`](../contracts/deployments/goat-mainnet.json).
+
+| Contract | Address |
+| --- | --- |
+| **X402Settler** | [`0x630b7C9D965994A3F2a2254534260A67423B6672`](https://explorer.goat.network/address/0x630b7C9D965994A3F2a2254534260A67423B6672) |
+| ReceiptRegistry | [`0xa5bEfC1bdc7ec16EfB0ecF8866566A9405999112`](https://explorer.goat.network/address/0xa5bEfC1bdc7ec16EfB0ecF8866566A9405999112) |
+| RevenueSplit | `0x2EDCd213F6A54A32079EE48B0da576ACE949f498` |
+| CascadeController | `0x3d7c7C21178F5d436004a1A44D42b8e7D0b322C8` |
+| PaymentChannel | `0x096F12309D718FC6E97e142B55feF2120647aB8B` |
+| QualityBond | `0x24Df4B7f3ECd1c5692D1e8FC91d46e119c355555` |
+| EscrowVault | `0xD6136DEc8D553D71DC5e865b89cC03b42b08BbF9` |
+| DisputeArbiter | `0x7fd534d61Baa0fB6Cc7D638A855e929B1a997291` |
+| ReputationScorer | `0x35aD6433d2e532c0938D79353F6882f68F2d36D2` |
+| ToolAuction | `0x83964A9e06661BE11DC702989FE7df4186a716Ea` |
+| AgentRegistry | `0xE8B5a5057300eD093BC363C77772f334B0a36e2c` |
+| SessionKeyDelegator | `0x307D63c900Fe15F8282f88bb8b9FF036c7Aac263` |
+| BitVM2Arbiter | `0x835E17d82c7393e974A6316Ac8BBF01B2132dB7a` (deployed, deliberately **not** authorized) |
+
+Reputation writes go to the **canonical** ERC-8004 registries, not a private fork:
+Identity `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` ·
+Reputation `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` ·
+Validation `0x8004Cc8439f36fd5F9F049D9fF86523Df6dAAB58`.
+
+### X402Settler deployment (2026-08-09)
+
+| Step | Tx |
+| --- | --- |
+| `CREATE X402Settler` | [`0xbec5e17f…`](https://explorer.goat.network/tx/0xbec5e17f1e3a792b73bd56b25f4a5bb2d8916dd58c82dc2f3df3ba181752cee2) |
+| `ReceiptRegistry.setRecorder(settler, true)` | [`0xe852868e…`](https://explorer.goat.network/tx/0xe852868e5e143a0d52bc8d10baad4ae257a203a391da209a748ae0f1284e059b) |
+| `setOperator(gateway, true)` | [`0xf56d814b…`](https://explorer.goat.network/tx/0xf56d814b2f1f4da062b64fbfc2e5fba7e8e2b4e9c247c9316e9143d06dbcd45c) |
+| `setMaxSettlement($5)` | [`0xa1d871f0…`](https://explorer.goat.network/tx/0xa1d871f04b048d50843de692630c858521ef6b9a0c504d36c6ce8cdfa7cd0c5a) |
+
+1,201,473 gas total ≈ **15.6 satoshi**. Live configuration, readable on chain:
+
+```
+feeBps          0          # off until switched on deliberately
+MAX_FEE_BPS     500        # 5% hard ceiling, enforced in the setter
+maxSettlement   5000000    # $5 guarded-launch cap per settlement
+isRecorder      true       # granted on ReceiptRegistry
+```
+
+### Governance — TimelockController (2026-08-09)
+
+[`0x14a19a0204a789F5fE1Eb498902D02ec5a8C08AB`](https://explorer.goat.network/address/0x14a19a0204a789F5fE1Eb498902D02ec5a8C08AB)
+· `minDelay` **6 hours** · proposer + admin: the deployer · executor `address(0)` (anyone, once
+the delay has elapsed).
+
+**Complete.** All **11 ownable contracts** are now owned by the timelock — `owner()` returns it
+on every one, and none is left on an EOA. The handover ran as a scheduled batch
+(`0xb25f7409321ea01be8e4bb6060c0f257bc65e739245a981d1f3a2e008a385463`, executed after the 6-hour
+delay elapsed). Because the contracts are `Ownable2Step` the deployer stayed owner throughout the
+waiting period, so a mistyped governance address could never have stranded anything.
+
+| Contract | `owner()` |
+| --- | --- |
+| X402Settler · ReceiptRegistry · RevenueSplit · CascadeController · QualityBond · EscrowVault · DisputeArbiter · ReputationScorer · ToolAuction · AgentRegistry · BitVM2Arbiter | `0x14a19a02…` (timelock) |
+
+Ownership does not touch the operational roles, and a real payment was settled after the handover
+to confirm it: `isRecorder(settler)`, `isRecorder(deployer)` and `isOperator(deployer)` are all
+still true, and a zero-gas buyer completed a co-signed purchase.
+
+Any privileged call now takes three steps and at least six hours:
+
+```bash
+cast send $TIMELOCK "schedule(address,uint256,bytes,bytes32,bytes32,uint256)" \
+  $TARGET 0 $CALLDATA 0x00…00 $SALT 21600 --rpc-url https://rpc.goat.network
+# …6 hours, publicly visible…
+cast send $TIMELOCK "execute(address,uint256,bytes,bytes32,bytes32)" \
+  $TARGET 0 $CALLDATA 0x00…00 $SALT --rpc-url https://rpc.goat.network
+```
+
+> **This is delay, not decentralization — and the distinction matters.** The proposer is still a
+> single EOA, so one key can still make any change; it just cannot make it *quietly or instantly*.
+> Every privileged call is now announced 6 hours in advance and executable by anyone, which is what
+> turns a silent compromise into a visible one. Real separation needs a Safe multisig as proposer
+> and the deployer's admin role renounced. Six hours rather than the two-day default because the
+> suite is still being iterated on; raise it through the timelock once it settles.
+>
+> `PaymentChannel` and `SessionKeyDelegator` are not in the list: neither has an owner.
+
+### First external payments — a wallet with zero gas (2026-08-09)
+
+`0x131d9db0888B1f182d3ffCd91A38333B4117e13c` was funded with **0.20 USDC.e and no BTC at all**,
+then paid a gateway running in a separate process that never held its key.
+
+| What | Tx | Result |
+| --- | --- | --- |
+| `get_goat_chain_stats` $0.01, fee 0% | [`0x25d76b35…`](https://explorer.goat.network/tx/0x25d76b3545427abf0c62747bc1a1563013f6eb1a95474ee9abfa0e880a00bca8) | 323,528 gas, one transaction |
+| `get_token_info` $0.02, **fee 2%** | [`0x11648cce…`](https://explorer.goat.network/tx/0x11648cce62ccc7c68226a48961942afc0231fcad9ee9d342d4885c207f0dfe8c) | treasury `0.000400`, seller `0.019600` |
+
+Six events inside the *single* settlement transaction — `AuthorizationUsed` →
+`Transfer` buyer→settler → `Transfer` settler→seller → `ReceiptRecorded` →
+`ReceiptAttested(2 = COSIGNED)` → `Settled`. The payment and its evidence cannot come apart.
+
+Verified independently against the chain afterwards:
+
+```
+buyer BTC balance      0 sats        unchanged — the buyer never sent a transaction
+buyer USDC.e           0.200 → 0.170
+seller USDC.e          0.029600      earned
+seller nonce           0             never sent a transaction either
+settler USDC.e         0             a conduit, holds nothing
+ReceiptRegistry.count  13 → 15
+cosignedCount          0 → 2         first dispute-grade receipts on the live suite
+```
+
+The fee was switched on for the second call and back to 0 immediately after
+([`0x563bfa01…`](https://explorer.goat.network/tx/0x563bfa011fcbd677623b61cae2e387fcb7cd8fb0e2d8c177f74cea740debf65b)),
+so the deployed default remains 0%.
+
+## GOAT Testnet3 (chainId 48816) — historical
 
 - **RPC:** `https://rpc.testnet3.goat.network`
 - **Explorer:** https://explorer.testnet3.goat.network

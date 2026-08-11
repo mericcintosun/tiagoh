@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent for the tiagoh buyer daemon.
+
+  KeepAlive restarts it if it crashes or the machine sleeps and wakes, which is the point: the
+  metric that matters is distinct active days, and a loop that silently stops on the first hiccup
+  produces a flat counter and an awkward conversation.
+
+  No secrets here — daemon.sh sources contracts/.env, so this file stays safe to commit.
+
+  Install:
+    cp tools/e2e/com.tiagoh.daemon.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.tiagoh.daemon.plist
+  Stop:
+    launchctl unload ~/Library/LaunchAgents/com.tiagoh.daemon.plist
+  Watch:
+    tail -f ~/tiagoh/.daemon.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tiagoh.daemon</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/mericcintosun/tiagoh/tools/e2e/daemon.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/mericcintosun/tiagoh</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Back off between restarts so a misconfiguration cannot spin in a tight loop. -->
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/mericcintosun/tiagoh/.daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/mericcintosun/tiagoh/.daemon.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- launchd gives a minimal PATH; pnpm/node live in the user's toolchain. -->
+    <key>PATH</key>
+    <string>/Users/mericcintosun/.nvm/versions/node/v24.15.0/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict>
+</plist>

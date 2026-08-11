@@ -4,12 +4,12 @@ This document is the security reference for the tiagoh contract suite. It record
 model, the roles, the invariants the tests enforce, the findings fixed during hardening, and the
 gates that MUST be cleared before mainnet. It is written to be an auditor's starting point.
 
-> Status: hardened and fully tested (160 Foundry tests — unit, fuzz, invariant; 71 TypeScript
-> tests), **not yet independently audited**. The contracts in `src/` are ahead of the addresses in
-> `contracts/deployments/goat-mainnet.json`: the second hardening pass below changed storage
-> layouts and function signatures, so **the suite must be redeployed** before those addresses
-> reflect this document. Do not move real user funds through these contracts until the "Mainnet
-> gates" below are all green.
+> Status: hardened, statically analysed and fully tested (**209 Foundry tests** — unit, fuzz,
+> invariant; **120 TypeScript tests**), **not yet independently audited**. Slither reports zero
+> high-severity findings across the suite and Aderyn none in `X402Settler` (§4d). The addresses in
+> `contracts/deployments/goat-mainnet.json` match this document. Guarded value caps stay on and
+> the "Mainnet gates" below are not all green — most notably the timelock's proposer is still a
+> single EOA — so do not move funds you cannot afford to lose through these contracts.
 
 ---
 
@@ -135,11 +135,63 @@ it claimed, and several things did not.
 | D15 | Low | The owner was implicitly a juror / recorder / reporter, contradicting §2 of this document | Removed everywhere, including `ToolAuction`'s shortcut on `clear`/`settle` |
 | D16 | Low | The default chain was Testnet3 while every address was mainnet, so "live" reads silently reported unavailable | Default chain is mainnet; testnet has its own env vars |
 
-### 4c. Static analysis + guarded launch
+### 4c. Third pass — the x402 settlement path (`X402Settler`)
+
+Adding a real external-payment path meant a new contract that touches money, and two bugs in the
+existing signing layer that had been invisible because nothing exercised them.
+
+| ID | Severity | Issue | Fix |
+| --- | --- | --- | --- |
+| S1 | Critical | **`settleBare` was going to be permissionless.** A standard x402 client produces a payment authorization but no tiagoh receipt signatures, so nothing binds `payee`. Anyone watching the mempool could have re-submitted a pending authorization naming themselves as payee and taken the payment | `settleBare` is `onlyOperator`. The signed path (`settle`) stays permissionless precisely *because* the signatures cover every field, so no allowlist is needed there |
+| S2 | High | **Cascade hops could never be co-signed.** `createChallengeReceiptSigner` hardcoded `parentId` to zero while the gateway counter-signed the real parent, so the two parties signed different structs and `anchorReceipt` rejected every hop. Co-signing failure is deliberately non-fatal, so this failed *silently*: multi-hop payments — the feature the product is built around — produced receipts that could never back a dispute | `parentId` is carried in the 402 challenge and signed by both sides (`gateway.toChallenge`, `receipts.ts`); regression tests assert a hop's buyer signature verifies against the gateway's struct |
+| S3 | High | **A chain-id mismatch produced a valid signature for the wrong chain.** The chain id is part of the EIP-712 domain, so a stale `GOAT_CHAIN_ID=48816` against a mainnet RPC yields a well-formed authorization the token rejects as "invalid signature" — pointing the reader at the signer instead of at their config. This is how it was actually found | `resolveTokenDomain` reads `eth_chainId` and refuses to sign on a mismatch, with an error that names both values |
+| S4 | Medium | **Donated tokens were permanently stranded.** Settlement books the balance *delta*, and the settler is a pure conduit with no other way to move a balance — so anything sent here by mistake was lost | Permissionless `sweep()` pushes any stray balance to `treasury`. Permissionless because the destination is fixed, so it adds no privilege that `setTreasury` does not already imply, and recovery does not depend on the owner key |
+| S5 | Medium | An owner could have set an arbitrary protocol fee | `MAX_FEE_BPS = 500` (5%), enforced in the setter; `feeBps` ships at 0 |
+| S6 | Low | Wallets disagree on whether `v` is 27/28 or 0/1; the token only accepts the former, so valid signatures would be rejected depending on which library produced them | `_splitSignature` normalizes `v` and rejects anything that is still not 27/28 |
+
+**Why atomicity matters here.** `settle` anchors the co-signed receipt in the *same transaction*
+that moves the money. If either signature is bad, `anchorReceipt` reverts and the payment reverts
+with it. The cheapest, most convenient path is therefore also the one that produces dispute-grade
+evidence — a settled payment cannot exist without it. The previous two-transaction shape could
+leave a paid call whose receipt never anchored.
+
+**Replay protection moved into the token.** The gateway's challenge nonce is reused verbatim as
+the ERC-3009 authorization nonce, so `authorizationState` is the guard. That is strictly stronger
+than the in-memory nonce set, which only ever protected a single process (§5) — double-charging is
+now impossible across a cluster, though tool-execution idempotency is still per-instance.
+
+**Residual risks specific to this path:**
+
+- **Simulation is not a guarantee.** `verify` proves the authorization is settleable *now*; the
+  buyer could move funds before settlement lands. Charge-on-success means the tool has already run
+  at that point, so the seller eats one call. Bounded and logged, not silent.
+- **The fee can change between quote and settlement.** The buyer is unaffected (they signed a
+  fixed `value`), but the seller's share could shift. Bounded by `MAX_FEE_BPS`, owner-only, and
+  observable once the owner is a timelock.
+- **A settler-written receipt (`settleBare`) is `RECORDER`-level**, so harm-binding still rejects
+  it. It is nonetheless stronger than gateway telemetry: it is emitted in the same transaction as
+  a real token transfer, so it cannot describe a payment that did not happen.
+
+### 4d. Static analysis + guarded launch
+
+Free tooling only — this is **not** a substitute for an independent audit, and the guarded caps
+stay on. Last run 2026-08-09 against the full suite:
+
+| Tool | Result |
+| --- | --- |
+| **Slither** (`--config-file contracts/slither.config.json`) | **0 high**, 19 medium, 36 low, 6 informational. The one high it originally reported (`reentrancy-balance` in `X402Settler._pullAndSplit`) was investigated and is unreachable — both entry points are `nonReentrant`, the function is `private`, every other state-changing function is `onlyOwner`, and `token` is immutable. Suppressed at the line with that justification. Investigating it is what surfaced S4. |
+| **Aderyn** 0.1.9 | 4 high, all pre-existing and all false positives: `transferFrom` with a "arbitrary" `from` that is literally `msg.sender` (`DisputeArbiter:108`); a storage struct passed to a `memory` parameter for a read-only score computation; deliberately zero-initialized counters; a return value whose only consumer is the `RecourseExecuted` event emitted inside the same function. **Zero findings in `X402Settler`.** |
+| **Foundry** | 209 tests: unit, fuzz (`fee + net == gross` exact at every fee and amount), invariant (2048 calls/run, 0 reverts, with an `afterInvariant` guard so a run that settled nothing fails rather than passing vacuously) |
+| **Coverage** (`forge coverage --ir-minimum`) | `X402Settler`: **100% lines, 100% functions**, 98.8% statements, 94.4% branches |
+
+Remaining Slither mediums in the new contract: one `incorrect-equality` for `received == 0`,
+which is a deliberate "nothing arrived" guard rather than a balance comparison driving logic.
 
 - **Slither** runs in CI (`.github/workflows/ci.yml`, `slither` job, fail-on high).
 - **Guarded launch (no-audit-budget mitigation):** the value at risk per position is capped so a
   pre-audit mainnet bounds any single loss:
+  - `X402Settler.maxSettlement` (owner-settable, 0 = unlimited) — $5 on the live deployment
+  - `X402Settler.MAX_FEE_BPS` (compile-time constant, 5%) — the owner cannot exceed it
   - `EscrowVault.maxEscrow` (owner-settable, 0 = unlimited)
   - `CascadeController.maxBudget` (owner-settable, 0 = unlimited)
   - `PaymentChannel.depositCap` (immutable, set at deploy)
@@ -171,11 +223,26 @@ it claimed, and several things did not.
   ready to wire, and the deploy scripts deliberately do **not** grant it `isArbiter`.
 - **A malicious or colluding juror can still rule wrongly** within the harm cap. Mitigate by
   running the juror as a multisig and moving toward (1)/(2) above.
-- **Replay protection is per-gateway-process.** `InMemoryChallengeStore` is correct for a single
-  node; a multi-instance deployment MUST supply a shared `ChallengeStore` (Redis/Postgres), or
-  each instance keeps its own nonce set. The interface is public for exactly this reason.
+- **Replay protection is per-gateway-process — for tool execution.** `InMemoryChallengeStore` is
+  correct for a single node; a multi-instance deployment MUST supply a shared `ChallengeStore`
+  (Redis/Postgres), or each instance keeps its own nonce set. The interface is public for exactly
+  this reason. **The payment leg is no longer affected**: the challenge nonce doubles as the
+  ERC-3009 authorization nonce, so the token's `authorizationState` prevents double-charging
+  across any number of instances. What a split nonce set still costs you is a duplicate *tool
+  execution*, not a duplicate charge.
 - **On-chain ERC-8004 feedback is Sybil-able by spec** when deployed permissionless. Deploy with
   `FeedbackAllowlist` (gated mode) or a receipt-gated `IFeedbackAuthorizer`.
+- **Two gateways sharing one submitter key will race nonces.** Settlement serializes
+  transactions *within* a process, but the daemon and the hosted endpoint are separate processes;
+  pointed at the same submitter they can build conflicting nonces and one transaction is dropped.
+  The payment is not lost (the authorization stays unspent and the call can be retried), but it is
+  a real operational failure mode. Give each gateway its own submitter key, or put a shared nonce
+  manager in front.
+- **The hosted MCP paywall keeps no server-side challenge state**, by design — see
+  `apps/dashboard/lib/x402-paywall.ts`. Challenges are HMAC-signed rather than remembered, and
+  replay is prevented by the token's own `authorizationState`. The accepted residue is that two
+  *concurrent* requests carrying one fresh authorization can both execute before either settles,
+  costing one extra read-only tool run and no double charge.
 - **Non-standard tokens.** Fee-on-transfer is handled (balance-delta), but exotic tokens
   (rebasing-down mid-hold, callback-on-transfer) are out of scope — use a vetted stablecoin.
 - **Metadata privacy.** Every anchored receipt publishes `keccak256(toolName)`, payer and payee.
@@ -189,13 +256,17 @@ it claimed, and several things did not.
 
 1. **Redeploy the suite.** The second hardening pass changed storage layouts and signatures; the
    addresses in `deployments/goat-mainnet.json` are the pre-hardening contracts.
-2. **Ownership → Timelock + multisig.** `DeployTimelock.s.sol` then `TransferOwnership.s.sol`;
-   governance calls `acceptOwnership()` on each contract. No EOA owner in production.
+2. **Ownership → Timelock + multisig.** *Timelock done; multisig not.* A `TimelockController`
+   with a 6-hour delay at `0x14a19a0204a789F5fE1Eb498902D02ec5a8C08AB` **owns all 11 ownable
+   contracts** — no EOA owner remains. What is still missing is the *multisig*: the proposer is a
+   single EOA, so this buys delay and public visibility, not separation of powers. A compromised
+   key can still make any change; it can no longer make one quietly or instantly. Remaining: a
+   Safe as proposer, and the deployer's `TIMELOCK_ADMIN_ROLE` renounced.
 3. **Grant every role explicitly.** Nothing is implicit any more: recorder, juror, arbiter and
    reporter must each be assigned, or that capability simply does not exist.
-4. **Real facilitator.** Set `facilitatorUrl` so `createFacilitatorVerify` +
-   `createFacilitatorSettle` are live. The gateway refuses to run priced tools unverified unless
-   `allowUnverifiedPayments` is set — never set it in production.
+4. **Real verification.** *Done.* The gateway verifies every authorization against the chain by
+   simulating the transfer (`createErc3009Verify`), so no external facilitator is required and
+   `allowUnverifiedPayments` is no longer set anywhere on a real path.
 5. **Co-signing wired.** `TIAGOH_PRIVATE_KEY` + `RECEIPT_REGISTRY_ADDRESS` on the gateway, and a
    receipt signer on the client. Without both, receipts are telemetry and buyers have no recourse.
 6. **Real payment token.** Point `asset` at a vetted ERC-3009 stablecoin (GOAT mainnet has bridged

@@ -17,20 +17,50 @@ import {
   type IssuedChallenge,
 } from "./challenges.js";
 
+export type { IssuedChallenge };
+
 /** The 402 body. Everything the buyer needs to pay, and to co-sign the resulting receipt. */
 export interface PaymentChallenge {
   /** Minor units of `asset`, base-10 integer string. Never a float. */
   amount: string;
   asset: string;
   assetDecimals: number;
+  /** CAIP-2 chain id, e.g. `eip155:2345` — the form the x402 v2 `exact` scheme uses. */
   network: string;
+  /** The seller's identity: who the receipt names as payee, and who counter-signs it. */
   payTo: string;
+  /**
+   * Where the money is actually sent. This is the `X402Settler` when one is configured (it pulls
+   * the authorization, takes the protocol fee and anchors the receipt in one transaction), and
+   * `payTo` otherwise. It is separate from `payTo` because the address that *receives* a transfer
+   * and the address that *signs* the receipt cannot be the same once a contract sits in between.
+   */
+  settleTo: string;
   tool: string;
-  /** Single-use nonce; must be echoed on the paid retry. */
+  /** Single-use nonce; must be echoed on the paid retry. Also the ERC-3009 authorization nonce. */
   nonce: string;
   /** Deterministic id of the receipt this call will produce, so the buyer can pre-sign it. */
   receiptId: string;
+  /**
+   * Cascade parent of this call, or null at a root.
+   *
+   * It is in the challenge because the buyer signs the receipt *before* the seller does the work,
+   * and the receipt struct includes `parentId`. Omitting it meant the buyer signed a struct with
+   * a zero parent while the seller counter-signed one with the real parent, so the two signatures
+   * covered different messages and `anchorReceipt` rejected every cascade hop.
+   */
+  parentId: string | null;
   expiresAt: number;
+  /** x402 v2 payment requirements, so a standard x402 client can pay without knowing tiagoh. */
+  accepts: Array<{
+    scheme: "exact";
+    network: string;
+    amount: string;
+    asset: string;
+    payTo: string;
+    maxTimeoutSeconds: number;
+    extra: { assetTransferMethod: "eip3009" };
+  }>;
 }
 
 export type SettleFn = (args: {
@@ -41,6 +71,12 @@ export type SettleFn = (args: {
   parentId: string | null;
   signature: string;
   nonce: string;
+  /**
+   * The fully-formed receipt this call produced, already counter-signed when the buyer pre-signed
+   * it. Settlement needs it because the atomic path anchors the receipt in the same transaction
+   * that moves the money — a payment and its evidence should not be able to disagree.
+   */
+  receipt: Receipt;
 }) => Promise<{ txHash?: string; payee: string }>;
 
 export type VerifyPaymentFn = (args: {
@@ -51,6 +87,8 @@ export type VerifyPaymentFn = (args: {
   payer: string;
   parentId: string | null;
   nonce: string;
+  /** The challenge this payment claims to answer, so a verifier can bind every field. */
+  challenge: PaymentChallenge;
 }) => Promise<boolean>;
 
 /** Counter-signs the receipt on the seller's behalf, producing dispute-grade evidence. */
@@ -186,11 +224,11 @@ export class TiagohGateway {
 
     // The challenge must match the call it is being spent on: a nonce issued for a cheap tool
     // cannot be redirected at an expensive one, or spent by a different payer.
-    const challenge = state.challenge;
+    const issued = state.challenge;
     if (
-      challenge.tool !== input.tool ||
-      challenge.amount !== serializeMinor(amount) ||
-      challenge.payer !== payer
+      issued.tool !== input.tool ||
+      issued.amount !== serializeMinor(amount) ||
+      issued.payer !== payer
     ) {
       return { kind: "payment_required", challenge: await this.issue(input.tool, amount, payer, parentId) };
     }
@@ -207,6 +245,7 @@ export class TiagohGateway {
           payer,
           parentId,
           nonce: input.nonce,
+          challenge: this.toChallenge(issued),
         });
       } catch {
         valid = false;
@@ -262,8 +301,14 @@ export class TiagohGateway {
   }
 
   /**
-   * Run the tool, then settle. The order matters: the tool may cascade using this call's
-   * paymentId as the parent, and a tool that throws must never be billed.
+   * Run the tool, counter-sign the receipt, then settle. The order matters three times over:
+   *
+   *  - the tool runs first because it may cascade using this call's paymentId as the parent, and
+   *    because a tool that throws must never be billed (charge-on-success);
+   *  - the receipt is counter-signed *before* settlement, because the atomic settle path anchors
+   *    it in the same transaction that moves the money. Signing afterwards would leave the
+   *    payment and its evidence in separate transactions that can diverge;
+   *  - settlement is last, so nothing is charged for work that did not happen.
    */
   private async execute(input: {
     tool: string;
@@ -287,15 +332,6 @@ export class TiagohGateway {
       paymentId,
       parentId: input.parentId,
     });
-    const { txHash, payee } = await this.opts.settle({
-      paymentId,
-      tool: input.tool,
-      amount: input.amount,
-      payer: input.payer,
-      parentId: input.parentId,
-      signature: input.signature,
-      nonce: input.nonce,
-    });
 
     let receipt = this.receipt(
       paymentId,
@@ -304,14 +340,15 @@ export class TiagohGateway {
       input.payer,
       input.parentId,
       "settled",
-      payee,
-      txHash,
+      this.config.payTo,
+      undefined,
       input.receiptSignature,
     );
 
-    // Counter-sign so the receipt becomes evidence rather than the seller's own claim. A
-    // signing failure must not fail the call — the buyer already paid and got their result —
-    // but it does mean this receipt cannot back a dispute.
+    // Counter-sign so the receipt becomes evidence rather than the seller's own claim. A signing
+    // failure must not fail the call — the buyer is about to get their result either way — but it
+    // does mean this receipt cannot back a dispute, and an atomic settler will refuse to anchor
+    // it, falling the deployment back to a telemetry-grade record.
     if (this.opts.cosign && input.receiptSignature) {
       try {
         receipt = { ...receipt, payeeSignature: await this.opts.cosign(receipt) };
@@ -320,6 +357,18 @@ export class TiagohGateway {
       }
     }
 
+    const { txHash, payee } = await this.opts.settle({
+      paymentId,
+      tool: input.tool,
+      amount: input.amount,
+      payer: input.payer,
+      parentId: input.parentId,
+      signature: input.signature,
+      nonce: input.nonce,
+      receipt,
+    });
+
+    receipt = { ...receipt, txHash, payee };
     this.opts.onReceipt?.(receipt);
     return { kind: "ok", result, receipt };
   }
@@ -338,23 +387,47 @@ export class TiagohGateway {
       ttlMs: this.opts.challengeTtlMs,
     });
     await this.challenges.issue(challenge);
+    return this.toChallenge(challenge);
+  }
+
+  /**
+   * Render a stored challenge as the wire object. Kept deterministic and separate from `issue`
+   * so verification can reconstruct the exact challenge a payment claims to answer, rather than
+   * trusting the fields the payer echoed back.
+   */
+  private toChallenge(issued: IssuedChallenge): PaymentChallenge {
+    const network = `eip155:${this.config.chainId}`;
+    const settleTo = this.config.settler ?? this.config.payTo;
     return {
-      amount: challenge.amount,
+      amount: issued.amount,
       asset: this.config.asset,
       assetDecimals: this.config.assetDecimals,
-      network: `goat:${this.config.chainId}`,
+      network,
       payTo: this.config.payTo,
-      tool,
-      nonce: challenge.nonce,
+      settleTo,
+      tool: issued.tool,
+      nonce: issued.nonce,
       // Deterministic, so the buyer can sign the receipt before the seller does the work.
       receiptId: deriveReceiptId({
-        payer,
+        payer: issued.payer,
         payee: this.config.payTo,
-        tool,
-        amount: challenge.amount,
-        nonce: challenge.nonce,
+        tool: issued.tool,
+        amount: issued.amount,
+        nonce: issued.nonce,
       }),
-      expiresAt: challenge.expiresAt,
+      parentId: issued.parentId,
+      expiresAt: issued.expiresAt,
+      accepts: [
+        {
+          scheme: "exact",
+          network,
+          amount: issued.amount,
+          asset: this.config.asset,
+          payTo: settleTo,
+          maxTimeoutSeconds: Math.max(1, Math.round((issued.expiresAt - Date.now()) / 1000)),
+          extra: { assetTransferMethod: "eip3009" },
+        },
+      ],
     };
   }
 
@@ -412,7 +485,9 @@ export class TiagohGateway {
       const out = await this.handleToolCall({
         tool: body.tool,
         args: body.args,
-        signature: header(req, TIAGOH.PAYMENT_SIG_HEADER),
+        // `X-PAYMENT` is what the x402 v2 spec names; the tiagoh header predates it and stays
+        // supported, so a standard x402 client and an existing tiagoh client both work.
+        signature: header(req, TIAGOH.X402_PAYMENT_HEADER) ?? header(req, TIAGOH.PAYMENT_SIG_HEADER),
         nonce: header(req, TIAGOH.NONCE_HEADER),
         receiptSignature: header(req, TIAGOH.RECEIPT_SIG_HEADER),
         payer: body.payer,

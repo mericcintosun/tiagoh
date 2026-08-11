@@ -7,9 +7,10 @@
   "deployer": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
   "paymentToken": "0x3022b87ac063DE95b1570F46f5e470F8B53112D8",
   "paymentTokenSymbol": "USDC.e",
-  "paymentTokenNote": "Real bridged stablecoin (Bridged USDC via Stargate, 6 decimals) — replaces the DemoToken used by earlier suites.",
-  "note": "USDC.e-bound redeploy (2026-07-30, DeployMainnetUSDC.s.sol), carrying over the hardened suite's role model and caps: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100, DisputeArbiter.disputeStake=$1, ToolAuction.bidBond=$1. BitVM2Arbiter is deployed with recourse reads wired but deliberately NOT authorized on bond/escrow until a real fraud-proof verifier exists (docs/SECURITY.md §5). The private ERC8004ReputationRegistry fork + FeedbackAllowlist are retired — reputation writes go to the canonical 0x8004… registries. Owner is still an EOA: transfer to a timelock + multisig before real value flows.",
+  "paymentTokenNote": "Real bridged stablecoin (Bridged USDC via Stargate, 6 decimals) \u2014 replaces the DemoToken used by earlier suites.",
+  "note": "USDC.e-bound redeploy (2026-07-30, DeployMainnetUSDC.s.sol), carrying over the hardened suite's role model and caps: EscrowVault.maxEscrow=$50, CascadeController.maxBudget=$100, PaymentChannel.depositCap=$100, DisputeArbiter.disputeStake=$1, ToolAuction.bidBond=$1. BitVM2Arbiter is deployed with recourse reads wired but deliberately NOT authorized on bond/escrow until a real fraud-proof verifier exists (docs/SECURITY.md \u00a75). The private ERC8004ReputationRegistry fork + FeedbackAllowlist are retired \u2014 reputation writes go to the canonical 0x8004\u2026 registries. Ownership moved to a TimelockController (6h delay) on 2026-08-10 \u2014 no EOA owner remains; see the governance block below. A Safe multisig as proposer is still outstanding.",
   "contracts": {
+    "X402Settler": "0x630b7C9D965994A3F2a2254534260A67423B6672",
     "ReceiptRegistry": "0xa5bEfC1bdc7ec16EfB0ecF8866566A9405999112",
     "RevenueSplit": "0x2EDCd213F6A54A32079EE48B0da576ACE949f498",
     "CascadeController": "0x3d7c7C21178F5d436004a1A44D42b8e7D0b322C8",
@@ -27,13 +28,32 @@
     "IdentityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
     "ReputationRegistry": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
     "ValidationRegistry": "0x8004Cc8439f36fd5F9F049D9fF86523Df6dAAB58",
-    "note": "Canonical cross-chain deployments (ERC1967 proxies, live on GOAT since 2026-02-12, owner = official 8004 team key). Reputation giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32) verified identical to our retired fork's ABI via the explorer-published implementation ABI. ValidationRegistry implementation source is NOT verified on the explorer — probe before first write."
+    "note": "Canonical cross-chain deployments (ERC1967 proxies, live on GOAT since 2026-02-12, owner = official 8004 team key). Reputation giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32) verified identical to our retired fork's ABI via the explorer-published implementation ABI. ValidationRegistry implementation source is NOT verified on the explorer \u2014 probe before first write."
+  },
+  "x402Settlement": {
+    "deployed": "2026-08-09",
+    "settler": "0x630b7C9D965994A3F2a2254534260A67423B6672",
+    "deployTx": "0xbec5e17f1e3a792b73bd56b25f4a5bb2d8916dd58c82dc2f3df3ba181752cee2",
+    "scheme": "x402 v2 `exact` over ERC-3009 \u2014 self-facilitated, no external facilitator needed.",
+    "tokenIsFiatTokenV2": "USDC.e 0x3022b87a\u2026 is a genuine Circle FiatTokenV2: transferWithAuthorization / receiveWithAuthorization / cancelAuthorization / permit all present. EIP-712 domain {name: 'Bridged USDC (Stargate)', version: '2', chainId: 2345} reproduces the token's own DOMAIN_SEPARATOR 0x7ce5afae\u2026, verified 2026-08-09.",
+    "atomicity": "settle() pulls the authorization, takes the fee, pays the seller and anchors the CO-SIGNED receipt in one transaction. A bad receipt signature reverts the payment too, so a settled call always leaves dispute-grade evidence.",
+    "gasless": "The buyer signs only. Whoever relays pays gas, so a wallet holding nothing but USDC.e and zero BTC can buy tool calls.",
+    "config": {
+      "feeBps": 0,
+      "MAX_FEE_BPS": 500,
+      "maxSettlement": 5000000,
+      "treasury": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
+      "operator": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
+      "isRecorderOnReceiptRegistry": true
+    },
+    "audit": "Slither: 0 high across the suite. Aderyn: 0 findings in X402Settler. Coverage: 100% lines / 100% functions / 94.4% branches. See docs/SECURITY.md \u00a74c. NOT independently audited \u2014 maxSettlement is the guarded cap."
   },
   "liveProofs": {
     "genesisReceipt": "ReceiptRegistry.count == 1 (tiagoh:mainnet:usdc:genesis, token == USDC.e)",
-    "guardedCaps": "EscrowVault.maxEscrow == 50000000 · CascadeController.maxBudget == 100000000",
-    "griefingControls": "DisputeArbiter.disputeStake == 1000000 · ToolAuction.bidBond == 1000000",
-    "leastPrivilege": "EscrowVault.isArbiter(BitVM2Arbiter) == false · no implicit owner roles anywhere"
+    "guardedCaps": "EscrowVault.maxEscrow == 50000000 \u00b7 CascadeController.maxBudget == 100000000",
+    "griefingControls": "DisputeArbiter.disputeStake == 1000000 \u00b7 ToolAuction.bidBond == 1000000",
+    "leastPrivilege": "EscrowVault.isArbiter(BitVM2Arbiter) == false \u00b7 no implicit owner roles anywhere",
+    "governance": "every Ownable2Step contract owner() == 0x14a19a02\u2026 (timelock)"
   },
   "legacySuites": {
     "hardened": {
@@ -67,5 +87,14 @@
       "DisputeArbiter": "0x4D2E9E59be3C600a634b6f5e09C7966DED09C9d7",
       "ReputationScorer": "0x13E12daAAFDb5E1fe53499BEa8D955Aa0B471215"
     }
+  },
+  "governance": {
+    "TimelockController": "0x14a19a0204a789F5fE1Eb498902D02ec5a8C08AB",
+    "minDelaySeconds": 21600,
+    "proposer": "0xcF35428Fe59E3b40EEa94adfFD5C898BDCc8b516",
+    "executor": "0x0000000000000000000000000000000000000000 (open: anyone, after the delay)",
+    "ownsAllOwnableContracts": true,
+    "acceptedBatch": "0xb25f7409321ea01be8e4bb6060c0f257bc65e739245a981d1f3a2e008a385463",
+    "note": "All 11 ownable contracts are owned by the timelock as of 2026-08-10; no EOA owner remains. This is delay and public visibility, NOT separation of powers: the proposer is still a single EOA. Remaining for a real governance story: a Safe multisig as proposer and the deployer TIMELOCK_ADMIN_ROLE renounced. PaymentChannel and SessionKeyDelegator have no owner."
   }
 }

@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
-    include: ["packages/**/test/**/*.test.ts", "tools/**/test/**/*.test.ts"],
+    include: ["packages/**/test/**/*.test.ts", "tools/**/test/**/*.test.ts", "apps/**/test/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**"],
     environment: "node",
   },
@@ -17,6 +17,7 @@ export default defineConfig({
       "@tiagoh/gateway": new URL("./packages/gateway/src/index.ts", import.meta.url).pathname,
       "@tiagoh/client": new URL("./packages/client/src/index.ts", import.meta.url).pathname,
       "@tiagoh/agent": new URL("./packages/agent/src/index.ts", import.meta.url).pathname,
+      "@/lib": new URL("./apps/dashboard/lib", import.meta.url).pathname,
     },
   },
 });
