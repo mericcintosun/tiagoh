@@ -10,7 +10,7 @@ Machines are about to trade with machines at internet scale. They already have a
 x402. What they do not have is a way to *trust*: no recourse when a paid tool lies, no memory of who
 is reliable, no way to price competitively, and no way to compose payments through a supply chain of
 tools that each buy from other tools. **tiagoh is the layer that makes autonomous, machine‑to‑machine
-commerce trustworthy — and it settles with Bitcoin finality on GOAT Network.**
+commerce trustworthy — and it settles on GOAT Network, a Bitcoin L2.**
 
 ---
 
@@ -97,7 +97,7 @@ atomic, insured cascade.
 1. **Build on the rails, don't rebuild them.** x402 for payment, ERC‑8004 for identity, GOAT for
    settlement. tiagoh is the trust logic in between.
 2. **Enforcement by construction, not by trust.** Budgets, bonds, and refunds are enforced by
-   contracts and Bitcoin finality — not by a gateway's promise.
+   contracts, not by a gateway's promise.
 3. **Every claim is a transaction.** If we say it works, there is an explorer link — no mock in the
    path we claim is real.
 4. **Composability is the product.** The single feature no one else has is that payments form trees;

@@ -259,7 +259,7 @@ timeline for the roadmap.
 2. `CinematicIntro` (optional)
 3. **Hero** — H1 (display serif): *"Payments that cascade. Trust that settles."* Sub: tiagoh is the
    insured settlement layer for MCP on GOAT — pay per call over x402, cascade through insured,
-   reputation-ranked supply chains, settled with Bitcoin finality. Stat tiles: `contracts live`,
+   reputation-ranked supply chains, settled on GOAT. Stat tiles: `contracts live`,
    `real x402`, `N-hop insured`, `Bitcoin-settled`.
 4. **How it works** — Steps: `wrap → connect → cascade → insure`.
 5. **Get started** — 3 personas (seller / composer / buyer agent), copy-paste commands.

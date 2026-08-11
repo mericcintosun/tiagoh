@@ -40,9 +40,10 @@ not marketing. Everything settles on GOAT Network, a Bitcoin L2.
   `pnpm --filter @tiagoh/e2e agent`.
 - **Live dashboard** at [tiagoh.vercel.app](https://tiagoh.vercel.app) that reads the deployed
   contracts client side, no backend.
-- **Hosted MCP endpoint** at [/api/mcp](https://tiagoh.vercel.app/api/mcp), listed in the ClawUp MCP
-  marketplace, usable by any OpenClaw or ClawUp agent — nine paid tools in the $0.01–0.10 band,
-  six backed by live GOAT chain reads.
+- **Hosted MCP endpoint** at [/api/mcp](https://tiagoh.vercel.app/api/mcp) — seven tools, every one
+  reading a live source at call time. Two are free; the rest cost $0.02 and settle per call. Any MCP
+  host can call it over streamable-HTTP, and payment travels either in `X-PAYMENT` or as tool
+  arguments, so hosts that cannot set custom headers can still pay.
 - **Anyone can pay, with no gas and no account.** GOAT's bridged **USDC.e** is a real Circle
   FiatTokenV2, so tiagoh runs the canonical x402 v2 `exact` scheme natively: the buyer signs an
   ERC-3009 authorization, the gateway verifies it against the chain before doing any work, and

@@ -12,19 +12,15 @@ MCP endpoint** — no local bridge to run.
 ```
 OpenClaw agent (on ClawUp)  ──MCP (streamable-http)──▶  https://tiagoh.vercel.app/api/mcp
         │                                                 (tiagoh paid tools; x402-priced,
-        └── just calls the tool ──────────────────────────  settled on GOAT with Bitcoin finality)
+        └── just calls the tool ──────────────────────────  settled per call in USDC.e on GOAT)
 ```
 
 The agent calls a tool like any other; tiagoh serves the tools over HTTP and prices each call in
-x402. The tools are also listed in the **ClawUp MCP marketplace** (submission id: `tiagoh`), so any
-ClawUp agent can attach them with one click.
+x402. Two tools are free, so an agent gets something useful before any payment question arises.
 
 ## Setup
 
-**Option A — ClawUp marketplace (no config):** in ClawUp → **Tools → Marketplace**, find `tiagoh`
-and **Add to Agent**.
-
-**Option B — register the endpoint directly:** drop the `mcp.servers` block from
+**Register the endpoint directly:** drop the `mcp.servers` block from
 [`openclaw.json`](./openclaw.json) into `~/.openclaw/openclaw.json`, or run:
 
 ```bash
@@ -38,6 +34,15 @@ openclaw mcp add tiagoh \
 
 ## Result
 
-Your ClawUp/OpenClaw agent can now say *"analyze this DeFi position"* and autonomously call the paid
-tiagoh tools it needs — priced per call over x402, with every receipt anchored on GOAT and bad
-outputs refundable via tiagoh's dispute + quality-bond layer.
+Your agent can call the tiagoh tools it needs, priced per call over x402, with every settlement
+anchored on GOAT.
+
+## What paying actually requires
+
+An agent needs a key to sign the ERC-3009 authorization — a host that only forwards tool calls can
+use the two free tools but cannot buy the paid ones. That is a property of the host, not of the
+endpoint: payment travels as tool arguments (`_payer`, `_challenge`, `_payment`) as well as headers,
+so nothing but the signature is missing.
+
+A ClawUp marketplace listing is the intended distribution path (Tools → Submit MCP); this file will
+say so plainly once one exists rather than in advance.

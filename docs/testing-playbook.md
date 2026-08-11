@@ -90,8 +90,9 @@ curl -s -X POST https://tiagoh.vercel.app/api/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-Expected: the three paid tiagoh tools (`get_goat_market_data`, `get_rwa_price`, `get_defi_yields`).
-The same endpoint is listed in the ClawUp MCP marketplace.
+Expected: seven tools. `get_goat_chain_stats` and `get_goat_gas` are free; `inspect_address`,
+`get_token_info`, `get_tx_status`, `get_erc8004_registry_stats` and `get_goat_market_data` cost
+$0.02 and answer an unpaid call with a signed payment challenge instead of data.
 
 ## What is not real yet
 

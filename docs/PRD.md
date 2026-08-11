@@ -6,7 +6,7 @@
 > caps and recursive revenue splits; every tool stakes a **quality bond** that is slashed on bad
 > output; broken cascades **unwind atomically** through BitVM2-arbitrated escrow; tools compete in
 > live **reverse auctions**; and everything anchors to portable **ERC-8004 reputation** — all
-> settled with **Bitcoin finality on GOAT Network**.
+> settled on **GOAT Network**, a Bitcoin L2.
 
 - **Status:** Draft v0.1
 - **Owner:** meric (mericcintosun)
@@ -33,7 +33,7 @@ defensible, demo-friendly stack.
 **One-liner (for the application form):**
 > *tiagoh is the trust layer for paid MCP tools on GOAT: agents pay per call over x402, payments
 > cascade through insured, reputation-ranked supply chains, and any broken hop unwinds atomically —
-> settled with Bitcoin finality.*
+> settled on GOAT Network.*
 
 ---
 
@@ -69,7 +69,7 @@ layer, and Bitcoin-grade finality is what makes multi-hop, insured settlement cr
 - **G4 — Be demo-able.** A live dashboard where a judge watches a cascade settle, a bond get slashed
   and auto-refund, and an auction clear — in real time.
 - **G5 — Lean on GOAT-native primitives** (ERC-8004, x402 DELEGATE settlement, ERC-4337 session
-  keys, BitVM2 fraud-proofs, Bitcoin finality, `.goat` naming) so the work is on-brand and
+  keys, BitVM2 fraud-proofs once its bridge leaves testnet, `.goat` naming) so the work is on-brand and
   defensible, not a portable pattern in GOAT paint.
 
 ### Non-goals (for the hackathon window)
@@ -204,7 +204,8 @@ refund UP a cascade tree with revenue splits is unbuilt anywhere**. This is tiag
     and can trigger bond slashing (§5.2).
 - **GOAT primitives:** **BitVM2 fraud-proof / challenge-response** repurposed as the on-chain
   arbitration substrate (GOAT built it for operator honesty; we reuse it to adjudicate
-  escrow-release / refund claims); **Bitcoin finality** as the release guarantee.
+  escrow-release / refund claims). NOTE: the BitVM2 bridge is testnet-only, so this is an upgrade
+  path, not a property the deployed system has today.
 - **Acceptance:** a 3-hop cascade where hop 3 fails → hops 1–2 auto-refund atomically with splits
   reversed → dispute logged → reputations updated; every step on the explorer.
 
